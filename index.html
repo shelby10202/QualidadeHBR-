@@ -6,7 +6,7 @@
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -16,16 +16,24 @@
 
 <div id="alert-container"></div>
 
-<!-- LOGIN -->
 <div id="login-screen">
+
   <form class="form" id="loginForm">
     <p id="heading">Login</p>
 
     <div class="field">
+      <svg class="input-icon" viewBox="0 0 16 16">
+        <path d="M13.106 7.222"></path>
+      </svg>
+
       <input id="loginEmail" class="input-field" type="email" placeholder="Email">
     </div>
 
     <div class="field">
+      <svg class="input-icon" viewBox="0 0 16 16">
+        <path d="M8 1a2 2 0 0 1 2 2v4H6V3a2 2 0 0 1 2-2z"></path>
+      </svg>
+
       <input id="loginSenha" class="input-field" type="password" placeholder="Senha">
     </div>
 
@@ -33,146 +41,227 @@
       <button type="submit" class="button1">Login</button>
       <button type="button" class="button2" id="signupBtn">Criar</button>
     </div>
-  </form>
-</div>
 
+    <p id="loginMessage" class="login-message" aria-live="polite"></p>
+  </form>
+
+</div>
 <div id="loader-screen" style="display: none;">
   <div class="loader"></div>
 </div>
 
-<!-- TOPBAR -->
-<header class="topbar">
-  <div class="logo">Controle Descarte e Entrega</div>
+<div class="app-shell">
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <img class="brand-logo" src="assets/hbr-logo.png" alt="HBR">
+      <div>
+        <strong>Quarentena</strong>
+        <small>Controle de aeronaves</small>
+      </div>
+    </div>
 
-  <nav class="menu">
-    <a onclick="showTab('tabela')">Tabela</a>
-    <a onclick="showTab('dashboard')">Dashboard</a>
-    <a onclick="showTab('historico')">Histórico</a>
-  </nav>
+    <nav class="sidebar-menu" aria-label="Navegação principal">
+      <button type="button" class="sidebar-link active" data-tab-target="tabela" onclick="showTab('tabela')">
+        <span class="nav-icon">Q</span>
+        <span>Lista atual</span>
+      </button>
+      <button type="button" class="sidebar-link" data-tab-target="dashboard" onclick="showTab('dashboard')">
+        <span class="nav-icon">D</span>
+        <span>Dashboard</span>
+      </button>
+      <button type="button" class="sidebar-link" data-tab-target="historico" onclick="showTab('historico')">
+        <span class="nav-icon">H</span>
+        <span>Histórico</span>
+      </button>
+    </nav>
 
-  <div class="user-area">
-    <span id="userEmail">...</span>
-  </div>
-</header>
+    <div class="sidebar-user">
+      <span>Usuário</span>
+      <strong id="userEmail">...</strong>
+    </div>
+  </aside>
 
-<!-- TABELA -->
-<section id="tabela" class="tab active">
-<table>
-<thead>
+  <main class="workspace">
+    <section id="tabela" class="tab active">
+      <div class="page-heading">
+        <div>
+          <p class="eyebrow">Lista atual</p>
+          <h1>Aeronaves em quarentena</h1>
+          <p class="page-subtitle">Controle de peças e status por aeronave.</p>
+        </div>
 
-<tr class="input-row">
-<td><input id="newPrefixo" class="input-custom" placeholder="PR-XXX"></td>
-<td><input id="newProtocolo" class="input-custom" placeholder="HBRQ-XXX"></td>
+        <div class="total-pill">
+          <span id="count_total">0</span>
+          <small>registros</small>
+        </div>
+      </div>
 
-<td>
-<select id="newSetor" class="input-custom">
-<option value="">-</option>
-<option value="Civil">Civil</option>
-<option value="Militar">Militar</option>
-</select>
-</td>
+      <div class="gallery-toolbar">
+        <div class="chip-row" aria-label="Filtros rápidos">
+          <button type="button" class="chip active" data-aircraft-filter="all">Todos</button>
+          <button type="button" class="chip" data-aircraft-filter="espera">Engenharia</button>
+          <button type="button" class="chip" data-aircraft-filter="scrap">Scrap</button>
+          <button type="button" class="chip" data-aircraft-filter="entregue">Entregues</button>
+        </div>
 
-<td>
-<select id="newEngenharia" class="input-custom">
-<option value="">-</option>
-<option value="Aprovado">Sim</option>
-<option value="espera">Em espera</option>
-</select>
-</td>
+        <div class="search-box">
+          <input id="aircraftSearch" type="search" placeholder="Buscar RAB, protocolo ou status...">
+        </div>
+      </div>
 
-<td>
-<select id="newStatus" class="input-custom">
-<option value="">-</option>
-<option value="entregue">Entregue</option>
-<option value="Descaracterização">Scrap</option>
-<option value="descarte">Descarte</option>
-<option value="espera_cliente">Aguardando Cliente</option>
-<option value="outros">Outros</option>
-</select>
-</td>
+      <form class="quick-add" aria-label="Adicionar aeronave em quarentena">
+        <input id="newPrefixo" class="input-custom" placeholder="RAB / PR-XXX">
+        <input id="newProtocolo" class="input-custom" placeholder="HBRQ-XXX">
 
-<td>
-<button id="addBtn" disabled>
-<span class="button_top">Adicionar</span>
-</button>
-</td>
-<td></td>
-</tr>
+        <select id="newModelo" class="input-custom" aria-label="Modelo da aeronave">
+          <option value="">Modelo</option>
+          <option value="AW109">AW109</option>
+          <option value="Bell">Bell</option>
+          <option value="H125">H125</option>
+          <option value="H130">H130</option>
+          <option value="H145">H145</option>
+          <option value="Robinson R66">Robinson</option>
+        </select>
 
-<tr>
-<th>Prefixo</th>
-<th>Protocolo</th>
-<th>Setor</th>
-<th>Engenharia</th>
-<th>Status</th>
-<th>Data</th>
-<th>Ações</th>
-</tr>
+        <select id="newSetor" class="input-custom">
+          <option value="">Setor</option>
+          <option value="Civil">Civil</option>
+          <option value="Militar">Militar</option>
+        </select>
 
-</thead>
+        <select id="newEngenharia" class="input-custom">
+          <option value="">Engenharia</option>
+          <option value="Aprovado">Sim</option>
+          <option value="espera">Em espera</option>
+        </select>
 
-<tbody id="table_body"></tbody>
-</table>
-</section>
+        <select id="newStatus" class="input-custom">
+          <option value="">Status</option>
+          <option value="entregue">Entregue</option>
+          <option value="Descaracterização">Scrap</option>
+          <option value="descarte">Descarte</option>
+          <option value="espera_cliente">Aguardando Cliente</option>
+          <option value="outros">Outros</option>
+        </select>
 
-<!-- DASHBOARD -->
-<section id="dashboard" class="tab">
-<div class="dashboard-container">
+        <button id="addBtn" disabled>
+          <span class="button_top">Adicionar</span>
+        </button>
+      </form>
 
-<div class="cards">
-<div class="card espera">
-<div class="card-title">Em Engenharia</div>
-<span id="count_espera">0</span>
+      <div id="aircraft_grid" class="aircraft-grid"></div>
+
+      <div id="empty_state" class="empty-state" hidden>
+        Nenhuma aeronave encontrada na lista atual.
+      </div>
+    </section>
+
+    <section id="dashboard" class="tab">
+
+    <div class="dashboard-container">
+
+    <div class="cards">
+
+      <div class="card espera">
+        <div class="card-title">Em Engenharia (Espera)</div>
+        <span id="count_espera">0</span>
+      </div>
+
+      <div class="card scrap">
+        <div class="card-title">Scrap</div>
+        <span id="count_scrap">0</span>
+      </div>
+
+      <div class="card entregue">
+        <div class="card-title">Entregues</div>
+        <span id="count_entregue">0</span>
+      </div>
+
+      <div class="card outros">
+        <div class="card-title">Outros</div>
+        <span id="count_outros">0</span>
+      </div>
+    </div>
+
+    <div class="graficos-container">
+      <div class="grafico-box">
+        <h3>Evolução</h3>
+        <canvas id="grafico"></canvas>
+      </div>
+
+      <div class="grafico-box">
+        <h3>Status</h3>
+        <canvas id="graficoPizza"></canvas>
+      </div>
+    </div>
+
+    </div>
+
+    </section>
+
+    <section id="historico" class="tab">
+
+      <div class="dashboard-container">
+
+        <h3>Histórico</h3>
+
+        <div class="historico-filtros">
+          <input id="filtroPrefixo" placeholder="Filtrar prefixo" class="input-custom">
+          <input id="filtroUsuario" placeholder="Filtrar usuário" class="input-custom">
+        </div>
+
+        <div id="timeline"></div>
+
+      </div>
+
+    </section>
+  </main>
 </div>
 
-<div class="card scrap">
-<div class="card-title">Scrap</div>
-<span id="count_scrap">0</span>
+<div id="editModal" class="edit-modal" hidden>
+  <form id="editForm" class="notification">
+    <div class="notiglow"></div>
+    <div class="notiborderglow"></div>
+
+    <button type="button" id="editCloseBtn" class="modal-close" aria-label="Fechar edicao">x</button>
+
+    <div class="notititle">Editar aeronave</div>
+    <div class="notibody">
+      <strong id="editAircraftTitle">RAB</strong>
+      <span id="editAircraftMeta">Protocolo e status atual</span>
+    </div>
+
+    <label class="edit-field">
+      <span>Status</span>
+      <select id="editStatus" class="input-custom">
+        <option value="entregue">Entregue</option>
+        <option value="Descaracterização">Scrap</option>
+        <option value="descarte">Descarte</option>
+        <option value="espera_cliente">Aguardando Cliente</option>
+        <option value="outros">Outros</option>
+      </select>
+    </label>
+
+    <p id="editMessage" class="edit-message"></p>
+
+    <div class="edit-actions">
+      <button type="button" id="editCancelBtn" class="modal-action secondary">Cancelar</button>
+      <button type="submit" id="editSaveBtn" class="modal-action">Salvar</button>
+    </div>
+  </form>
 </div>
 
-<div class="card entregue">
-<div class="card-title">Entregues</div>
-<span id="count_entregue">0</span>
-</div>
+<script type="module">
+  const loginMessage = document.getElementById("loginMessage");
 
-<div class="card outros">
-<div class="card-title">Total</div>
-<span id="count_outros">0</span>
-</div>
-</div>
-
-<div class="graficos-container">
-<div class="grafico-box">
-<h3>Evolução</h3>
-<canvas id="grafico"></canvas>
-</div>
-
-<div class="grafico-box">
-<h3>Status</h3>
-<canvas id="graficoPizza"></canvas>
-</div>
-</div>
-
-</div>
-</section>
-
-<!-- HISTÓRICO -->
-<section id="historico" class="tab">
-<div class="dashboard-container">
-
-<h3>Histórico</h3>
-
-<div class="historico-filtros">
-<input id="filtroPrefixo" class="input-custom" placeholder="Prefixo">
-<input id="filtroUsuario" class="input-custom" placeholder="Usuário">
-</div>
-
-<div id="timeline"></div>
-
-</div>
-</section>
-
-<script type="module" src="script.js"></script>
+  import("./script.js").catch((err) => {
+    console.error(err);
+    if (loginMessage) {
+      loginMessage.textContent = "Erro ao carregar o login. Verifique a internet e tente recarregar a pagina.";
+      loginMessage.classList.add("error");
+    }
+  });
+</script>
 
 </body>
 </html>
