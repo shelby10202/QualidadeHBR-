@@ -39,3 +39,15 @@ A verão atual da aplicação é a 0.2, atualizado no dia 01/06/2026.
 
 
 - Em desenvolvimento.
+
+
+
+## Authors
+
+- [@octokatherine](https://www.github.com/shelby10202)
+
+
+
+
+
+- Em desenvolvimento.
