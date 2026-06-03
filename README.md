@@ -1,7 +1,7 @@
 # Quarentena-
 ## HBRQ
 
-[![shelby10202](https://github-readme-stats.vercel.app/api/top-langs/?username=iuricode&hide=html&layout=compact&theme=default)](https://github.com/anuraghazra/github-readme-stats)
+[![Anurag's GitHub stats](https://github-readme-stats.vercel.app/api?username=shelby10202)](https://github.com/anuraghazra/github-readme-stats)
 Quarentena é um repertório criado inicialmente para atender a demanda de saídas de peças aeronáuticas do HBR, o projeto é inicialmente hospedado no FrontEnd do próprio GitHub com conexão para o Firebase. 
 
 A verão atual da aplicação é a 0.2, atualizado no dia 01/06/2026.
