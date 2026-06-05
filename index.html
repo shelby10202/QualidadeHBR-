@@ -51,33 +51,110 @@
 </div>
 
 <div class="app-shell">
-  <aside class="sidebar">
+  <aside class="sidebar sidebar-tree-shell">
     <div class="sidebar-brand">
       <img class="brand-logo" src="assets/hbr-logo.png" alt="HBR">
       <div>
-        <strong>Quarentena</strong>
-        <small>Controle de aeronaves</small>
+        <strong>Qualidade</strong>
       </div>
     </div>
 
-    <nav class="sidebar-menu" aria-label="Navegação principal">
-      <button type="button" class="sidebar-link active" data-tab-target="tabela" onclick="showTab('tabela')">
-        <span class="nav-icon">Q</span>
-        <span>Lista atual</span>
-      </button>
-      <button type="button" class="sidebar-link" data-tab-target="dashboard" onclick="showTab('dashboard')">
-        <span class="nav-icon">D</span>
-        <span>Dashboard</span>
-      </button>
-      <button type="button" class="sidebar-link" data-tab-target="historico" onclick="showTab('historico')">
-        <span class="nav-icon">H</span>
-        <span>Histórico</span>
-      </button>
+    <nav class="tree-container sidebar-tree" aria-label="Navegacao principal">
+      <ul>
+        <li class="tree-item">
+          <input type="checkbox" id="folder-hbr" class="tree-toggle" checked>
+          <label for="folder-hbr" class="tree-label">
+            <svg class="icon folder-closed-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 2H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"></path>
+            </svg>
+            <svg class="icon folder-open-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 2H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"></path>
+              <path d="M2 10h20"></path>
+            </svg>
+            HBR
+          </label>
+
+          <div class="tree-children-wrapper">
+            <ul class="tree-children">
+              <li class="tree-item">
+                <input type="checkbox" id="folder-quarentena" class="tree-toggle" checked>
+                <label for="folder-quarentena" class="tree-label">
+                  <svg class="icon folder-closed-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 2H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"></path>
+                  </svg>
+                  <svg class="icon folder-open-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 2H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"></path>
+                    <path d="M2 10h20"></path>
+                  </svg>
+                  Quarentena
+                </label>
+
+                <div class="tree-children-wrapper">
+                  <ul class="tree-children">
+                    <li class="tree-item">
+                      <button type="button" class="file-item is-selected" data-tab-target="tabela" onclick="showTab('tabela')">
+                        <svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                          <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"></path>
+                          <polyline points="14 2 14 8 20 8"></polyline>
+                        </svg>
+                        Lista atual
+                      </button>
+                    </li>
+                    <li class="tree-item">
+                      <button type="button" class="file-item" data-tab-target="dashboard" onclick="showTab('dashboard')">
+                        <svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                          <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"></path>
+                          <polyline points="14 2 14 8 20 8"></polyline>
+                        </svg>
+                        Dashboard
+                      </button>
+                    </li>
+                    <li class="tree-item">
+                      <button type="button" class="file-item" data-tab-target="historico" onclick="showTab('historico')">
+                        <svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                          <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"></path>
+                          <polyline points="14 2 14 8 20 8"></polyline>
+                        </svg>
+                        Historico
+                      </button>
+                    </li>
+                  </ul>
+                </div>
+              </li>
+
+              <li class="tree-item">
+                <input type="checkbox" id="folder-novas-areas" class="tree-toggle" checked>
+                <label for="folder-novas-areas" class="tree-label tree-section-label">
+                  <svg class="icon folder-closed-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 2H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"></path>
+                  </svg>
+                  <svg class="icon folder-open-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 2H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"></path>
+                    <path d="M2 10h20"></path>
+                  </svg>
+                  Novas areas
+                </label>
+                <div class="tree-children-wrapper">
+                  <ul id="sidebarDynamicAreas" class="tree-children dynamic-area-branch"></ul>
+                </div>
+              </li>
+            </ul>
+          </div>
+        </li>
+      </ul>
     </nav>
 
     <div class="sidebar-user">
-      <span>Usuário</span>
-      <strong id="userEmail">...</strong>
+      <div class="sidebar-user-info">
+        <span>Usuario</span>
+        <strong id="userEmail">...</strong>
+      </div>
+      <button type="button" id="adminAccessBtn" class="playstore-button admin-access-btn">
+        <span class="texts">
+          <span class="text-1">ACESSO</span>
+          <span class="text-2">Admin</span>
+        </span>
+      </button>
     </div>
   </aside>
 
@@ -241,6 +318,95 @@
       </div>
 
     </section>
+
+    <section id="admin" class="tab">
+      <div class="admin-page">
+        <div class="page-heading">
+          <div>
+            <p class="eyebrow">Admin</p>
+            <h1>Painel administrativo</h1>
+            <p class="page-subtitle">Mapa estrutural, novas areas e lembretes.</p>
+          </div>
+
+          <div class="total-pill">
+            <span id="adminAreaCount">1</span>
+            <small>areas</small>
+          </div>
+        </div>
+
+        <div class="admin-grid">
+          <article class="admin-panel admin-tree-panel">
+            <div class="admin-panel-head">
+              <span>Estrutura</span>
+              <strong>Ramificacoes do site</strong>
+            </div>
+            <div id="adminSiteTree" class="site-map-tree"></div>
+          </article>
+
+          <article class="admin-panel">
+            <div class="admin-panel-head">
+              <span>Expansao</span>
+              <strong>Criar nova area</strong>
+            </div>
+
+            <form id="adminAreaForm" class="admin-area-form">
+              <label>
+                <span>Nome da area</span>
+                <input id="adminAreaName" class="input-custom" placeholder="Ex.: Engenharia">
+              </label>
+
+              <label>
+                <span>Descricao</span>
+                <textarea id="adminAreaDescription" class="input-custom" placeholder="Objetivo da area"></textarea>
+              </label>
+
+              <button type="submit" class="modal-action">Criar area</button>
+              <p id="adminAreaMessage" class="edit-message"></p>
+            </form>
+          </article>
+
+          <article class="admin-panel admin-users-panel">
+            <div class="admin-panel-head">
+              <span>Usuarios</span>
+              <strong>Ultima vez online</strong>
+            </div>
+            <div id="adminUsersList" class="admin-users-list"></div>
+          </article>
+
+          <article class="admin-panel admin-wide-panel">
+            <div class="admin-panel-head">
+              <span>Areas</span>
+              <strong>Modulos cadastrados</strong>
+            </div>
+            <div id="adminAreasList" class="admin-areas-list"></div>
+          </article>
+
+          <article class="admin-panel">
+            <div class="admin-panel-head">
+              <span>Lembretes</span>
+              <strong>Checklist administrativo</strong>
+            </div>
+
+            <form id="adminReminderForm" class="admin-reminder-form">
+              <div class="reminder-input-wrap">
+                <input id="adminReminderText" class="input-custom" placeholder="Novo lembrete">
+                <button type="submit" class="reminder-add-btn" aria-label="Adicionar lembrete">+</button>
+              </div>
+            </form>
+
+            <div id="checklist" aria-label="Lembretes administrativos"></div>
+          </article>
+
+          <article class="admin-panel admin-history-panel">
+            <div class="admin-panel-head">
+              <span>Historico</span>
+              <strong>Alteracoes do Admin</strong>
+            </div>
+            <div id="adminHistoryList" class="admin-history-list"></div>
+          </article>
+        </div>
+      </div>
+    </section>
   </main>
 </div>
 
@@ -286,6 +452,33 @@
     <div class="edit-actions">
       <button type="button" id="editCancelBtn" class="modal-action secondary">Cancelar</button>
       <button type="submit" id="editSaveBtn" class="modal-action">Salvar</button>
+    </div>
+  </form>
+</div>
+
+<div id="adminGateModal" class="edit-modal" hidden>
+  <form id="adminGateForm" class="notification admin-gate">
+    <div class="notiglow"></div>
+    <div class="notiborderglow"></div>
+
+    <button type="button" id="adminGateCloseBtn" class="modal-close" aria-label="Fechar admin">x</button>
+
+    <div class="notititle">Acesso administrativo</div>
+    <div class="notibody">
+      <strong>Admin</strong>
+      <span>Senha interna do painel</span>
+    </div>
+
+    <label class="edit-field">
+      <span>Senha</span>
+      <input id="adminPassword" class="input-custom" type="password" placeholder="Senha do admin">
+    </label>
+
+    <p id="adminGateMessage" class="edit-message"></p>
+
+    <div class="edit-actions">
+      <button type="button" id="adminGateCancelBtn" class="modal-action secondary">Cancelar</button>
+      <button type="submit" class="modal-action">Entrar</button>
     </div>
   </form>
 </div>

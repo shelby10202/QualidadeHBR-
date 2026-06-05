@@ -1,5 +1,5 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import { getFirestore, collection, addDoc, getDocs, deleteDoc, doc, updateDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { getFirestore, collection, addDoc, getDocs, deleteDoc, doc, updateDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
 const firebaseConfig = {
@@ -78,6 +78,16 @@ const DASHBOARD_LINE_CONFIG = {
 
 const RAB_ENTRY_URL = "https://aeronaves.anac.gov.br/aeronaves/cons_rab.asp";
 const RAB_SEARCH_URL = "https://aeronaves.anac.gov.br/aeronaves/cons_rab_resposta2.asp";
+const ADMIN_PASSWORD_HASH = "9f1a87e271a323040c37d07ef8a93f044a6036ff1cce15a7700d5826ce024458";
+const ADMIN_UNLOCK_KEY = "hbr_admin_unlocked";
+const ADMIN_AREAS_KEY = "hbr_admin_site_areas";
+const ADMIN_REMINDERS_KEY = "hbr_admin_reminders";
+const ADMIN_HISTORY_KEY = "hbr_admin_history";
+const DEFAULT_ADMIN_REMINDERS = [
+  { id: "rab-review", text: "Revisar consultas RAB", done: true },
+  { id: "sheet-update", text: "Atualizar planilha FQ-067", done: false },
+  { id: "new-areas", text: "Planejar novas areas", done: false }
+];
 
 prepareStaticShells();
 
@@ -144,7 +154,28 @@ const el = {
   loaderScreen: document.getElementById("loader-screen"),
   timeline: document.getElementById("timeline"),
   filtroPrefixo: document.getElementById("filtroPrefixo"),
-  filtroUsuario: document.getElementById("filtroUsuario")
+  filtroUsuario: document.getElementById("filtroUsuario"),
+  adminAccessBtn: document.getElementById("adminAccessBtn"),
+  adminGateModal: document.getElementById("adminGateModal"),
+  adminGateForm: document.getElementById("adminGateForm"),
+  adminGateCloseBtn: document.getElementById("adminGateCloseBtn"),
+  adminGateCancelBtn: document.getElementById("adminGateCancelBtn"),
+  adminPassword: document.getElementById("adminPassword"),
+  adminGateMessage: document.getElementById("adminGateMessage"),
+  adminAreaCount: document.getElementById("adminAreaCount"),
+  adminSiteTree: document.getElementById("adminSiteTree"),
+  adminAreaForm: document.getElementById("adminAreaForm"),
+  adminAreaName: document.getElementById("adminAreaName"),
+  adminAreaDescription: document.getElementById("adminAreaDescription"),
+  adminAreaMessage: document.getElementById("adminAreaMessage"),
+  adminUsersList: document.getElementById("adminUsersList"),
+  adminAreasList: document.getElementById("adminAreasList"),
+  adminReminderForm: document.getElementById("adminReminderForm"),
+  adminReminderText: document.getElementById("adminReminderText"),
+  adminChecklist: document.getElementById("checklist"),
+  adminHistoryList: document.getElementById("adminHistoryList"),
+  sidebarDynamicAreas: document.getElementById("sidebarDynamicAreas"),
+  workspace: document.querySelector(".workspace")
 };
 
 let data = [];
@@ -154,6 +185,11 @@ let chartPizza;
 let activeAircraftFilter = "all";
 let editingItemId = null;
 let activeModalItems = [];
+let adminUnlocked = sessionStorage.getItem(ADMIN_UNLOCK_KEY) === "true";
+let dynamicSiteAreas = loadStoredAdminAreas();
+let adminReminders = loadStoredReminders();
+let adminHistory = loadStoredAdminHistory();
+let adminUsers = [];
 
 function prepareStaticShells() {
   // O dashboard antigo e parcialmente estatico e substituido por uma estrutura unica.
@@ -360,6 +396,7 @@ onAuthStateChanged(auth, async (user) => {
   el.loginScreen.style.display = "none";
   el.loaderScreen.style.display = "flex";
   if (el.userEmail) el.userEmail.textContent = user.email;
+  await saveCurrentUserPresence(user);
   await carregarDados();
   el.loaderScreen.style.display = "none";
 });
@@ -369,10 +406,33 @@ async function carregarDados() {
     const snap = await getDocs(collection(db, "pecas"));
     data = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
     await carregarHistorico();
+    await carregarUsuariosAdmin();
     renderTable();
     updateDashboard();
   } catch {
     alert("Erro ao carregar dados");
+  }
+}
+
+async function saveCurrentUserPresence(user) {
+  try {
+    const now = new Date();
+    await setDoc(doc(db, "usuarios", user.uid), {
+      email: user.email || "sem email",
+      ultimoOnline: now.toLocaleString("pt-BR"),
+      ultimoOnlineISO: now.toISOString()
+    }, { merge: true });
+  } catch {
+    // Se a regra do Firestore bloquear, o login continua funcionando normalmente.
+  }
+}
+
+async function carregarUsuariosAdmin() {
+  try {
+    const snap = await getDocs(collection(db, "usuarios"));
+    adminUsers = snap.docs.map((item) => ({ id: item.id, ...item.data() }));
+  } catch {
+    adminUsers = [];
   }
 }
 
@@ -436,6 +496,15 @@ el.itemsModal?.addEventListener("click", (event) => {
 el.rabInfoModal?.addEventListener("click", (event) => {
   if (event.target === el.rabInfoModal) fecharInformacoesRab();
 });
+el.adminAccessBtn?.addEventListener("click", requestAdminAccess);
+el.adminGateForm?.addEventListener("submit", handleAdminGateSubmit);
+el.adminGateCloseBtn?.addEventListener("click", closeAdminGate);
+el.adminGateCancelBtn?.addEventListener("click", closeAdminGate);
+el.adminGateModal?.addEventListener("click", (event) => {
+  if (event.target === el.adminGateModal) closeAdminGate();
+});
+el.adminAreaForm?.addEventListener("submit", handleCreateAdminArea);
+el.adminReminderForm?.addEventListener("submit", handleCreateReminder);
 el.filterChips.forEach((chip) => {
   chip.addEventListener("click", () => {
     activeAircraftFilter = chip.dataset.aircraftFilter || "all";
@@ -443,6 +512,682 @@ el.filterChips.forEach((chip) => {
     renderTable();
   });
 });
+
+renderAdminShell();
+
+function requestAdminAccess() {
+  if (adminUnlocked) {
+    window.showTab("admin");
+    return;
+  }
+  openAdminGate();
+}
+
+function openAdminGate() {
+  if (!el.adminGateModal) return;
+  el.adminGateModal.hidden = false;
+  if (el.adminPassword) el.adminPassword.value = "";
+  setAdminGateMessage("", "info");
+  setTimeout(() => el.adminPassword?.focus(), 0);
+}
+
+function closeAdminGate() {
+  if (el.adminGateModal) el.adminGateModal.hidden = true;
+}
+
+async function handleAdminGateSubmit(event) {
+  event.preventDefault();
+  const password = el.adminPassword?.value || "";
+  const passwordHash = await hashAdminPassword(password);
+
+  // O codigo guarda somente o hash; a senha em texto nao fica exposta no arquivo.
+  if (passwordHash !== ADMIN_PASSWORD_HASH) {
+    setAdminGateMessage("Senha administrativa incorreta.", "error");
+    return;
+  }
+
+  adminUnlocked = true;
+  sessionStorage.setItem(ADMIN_UNLOCK_KEY, "true");
+  closeAdminGate();
+  window.showTab("admin");
+}
+
+async function hashAdminPassword(value) {
+  if (!window.crypto?.subtle) return "";
+  const bytes = new TextEncoder().encode(value);
+  const digest = await window.crypto.subtle.digest("SHA-256", bytes);
+  return Array.from(new Uint8Array(digest))
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+function setAdminGateMessage(message, type = "info") {
+  if (!el.adminGateMessage) return;
+  el.adminGateMessage.textContent = message;
+  el.adminGateMessage.className = `edit-message ${type}`;
+}
+
+function renderAdminShell() {
+  renderDynamicAreaNavigation();
+  renderDynamicAreaTabs();
+  renderAdminPanel();
+  renderAdminChecklist();
+  renderAdminHistory();
+}
+
+function renderDynamicAreaNavigation() {
+  if (!el.sidebarDynamicAreas) return;
+  el.sidebarDynamicAreas.textContent = "";
+
+  if (!dynamicSiteAreas.length) {
+    const emptyItem = document.createElement("li");
+    emptyItem.className = "tree-item";
+    const empty = document.createElement("span");
+    empty.className = "tree-empty";
+    empty.textContent = "Nenhuma area criada";
+    emptyItem.appendChild(empty);
+    el.sidebarDynamicAreas.appendChild(emptyItem);
+    return;
+  }
+
+  dynamicSiteAreas.forEach((area) => {
+    const item = document.createElement("li");
+    item.className = "tree-item";
+
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "file-item area-node";
+    button.dataset.tabTarget = getDynamicAreaTabId(area.id);
+    button.addEventListener("click", () => window.showTab(getDynamicAreaTabId(area.id)));
+
+    const icon = createFileSvgIcon();
+
+    const label = document.createElement("span");
+    label.textContent = area.name;
+
+    button.append(icon, label);
+    item.appendChild(button);
+    el.sidebarDynamicAreas.appendChild(item);
+  });
+}
+
+function createFileSvgIcon() {
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("class", "icon");
+  svg.setAttribute("viewBox", "0 0 24 24");
+  svg.setAttribute("fill", "none");
+  svg.setAttribute("stroke", "currentColor");
+  svg.setAttribute("stroke-width", "2");
+  svg.setAttribute("stroke-linecap", "round");
+  svg.setAttribute("stroke-linejoin", "round");
+
+  const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+  path.setAttribute("d", "M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z");
+
+  const polyline = document.createElementNS("http://www.w3.org/2000/svg", "polyline");
+  polyline.setAttribute("points", "14 2 14 8 20 8");
+
+  svg.append(path, polyline);
+  return svg;
+}
+
+function renderDynamicAreaTabs() {
+  if (!el.workspace) return;
+
+  el.workspace.querySelectorAll(".dynamic-area-tab").forEach((section) => section.remove());
+
+  dynamicSiteAreas.forEach((area) => {
+    const section = document.createElement("section");
+    section.id = getDynamicAreaTabId(area.id);
+    section.className = "tab dynamic-area-tab";
+
+    const page = document.createElement("div");
+    page.className = "dynamic-area-page";
+
+    const heading = document.createElement("div");
+    heading.className = "page-heading";
+
+    const titleWrap = document.createElement("div");
+    const eyebrow = document.createElement("p");
+    eyebrow.className = "eyebrow";
+    eyebrow.textContent = "Area planejada";
+
+    const title = document.createElement("h1");
+    title.textContent = area.name;
+
+    const subtitle = document.createElement("p");
+    subtitle.className = "page-subtitle";
+    subtitle.textContent = area.description || "Modulo criado pelo painel administrativo.";
+
+    titleWrap.append(eyebrow, title, subtitle);
+
+    const status = document.createElement("div");
+    status.className = "total-pill";
+    const statusValue = document.createElement("span");
+    statusValue.textContent = "0";
+    const statusLabel = document.createElement("small");
+    statusLabel.textContent = "telas";
+    status.append(statusValue, statusLabel);
+
+    heading.append(titleWrap, status);
+
+    const panel = document.createElement("article");
+    panel.className = "admin-panel dynamic-placeholder";
+    panel.textContent = "Area registrada para expansao futura.";
+
+    page.append(heading, panel);
+    section.appendChild(page);
+    el.workspace.appendChild(section);
+  });
+}
+
+function renderAdminPanel() {
+  if (el.adminAreaCount) el.adminAreaCount.textContent = String(dynamicSiteAreas.length + 1);
+  renderAdminSiteTree();
+  renderAdminAreaList();
+  renderAdminUsers();
+}
+
+function renderAdminUsers() {
+  if (!el.adminUsersList) return;
+  el.adminUsersList.textContent = "";
+
+  if (!adminUsers.length) {
+    const empty = document.createElement("div");
+    empty.className = "admin-users-empty";
+    empty.textContent = "Nenhum usuario registrado nesta lista ainda.";
+    el.adminUsersList.appendChild(empty);
+    return;
+  }
+
+  const users = [...adminUsers].sort((a, b) => new Date(b.ultimoOnlineISO || 0) - new Date(a.ultimoOnlineISO || 0));
+  users.forEach((user) => {
+    const row = document.createElement("article");
+    row.className = "admin-user-row";
+
+    const content = document.createElement("div");
+    const email = document.createElement("strong");
+    email.textContent = user.email || "Usuario sem email";
+
+    const meta = document.createElement("span");
+    meta.textContent = user.ultimoOnline || "Sem registro de acesso";
+
+    content.append(email, meta);
+
+    const status = document.createElement("span");
+    const isOnline = user.email === auth.currentUser?.email;
+    status.className = `admin-user-status${isOnline ? " is-online" : ""}`;
+    status.textContent = isOnline ? "online" : "registro";
+
+    row.append(content, status);
+    el.adminUsersList.appendChild(row);
+  });
+}
+
+function renderAdminSiteTree() {
+  if (!el.adminSiteTree) return;
+  el.adminSiteTree.textContent = "";
+
+  el.adminSiteTree.className = "site-map-tree admin-flow-map";
+  const root = createFlowGroup("HBR", [
+    createFlowNode("Sistema", "Raiz", "root"),
+    createFlowNode("Usuario", "Login Firebase", "auth")
+  ]);
+  const quarantine = createFlowGroup("Quarentena", [
+    createFlowNode("Lista atual", "Cards e filtros", "page"),
+    createFlowNode("Dashboard", "Graficos e indicadores", "page"),
+    createFlowNode("Historico", "Linha do tempo", "page"),
+    createFlowNode("Itens", "Planilha FQ-067", "modal"),
+    createFlowNode("Consulta RAB", "ANAC", "modal")
+  ]);
+  const admin = createFlowGroup("Admin", [
+    createFlowNode("Mapa", "Ramificacoes", "tool"),
+    createFlowNode("Areas", "Criar, editar, excluir", "tool"),
+    createFlowNode("Lembretes", "Checklist", "tool"),
+    createFlowNode("Historico", "Reversao", "tool")
+  ]);
+  const futureNodes = dynamicSiteAreas.length
+    ? dynamicSiteAreas.map((area) => createFlowNode(area.name, area.description || "Planejada", "planned"))
+    : [createFlowNode("Nenhuma area", "Aguardando criacao", "muted")];
+  const future = createFlowGroup("Futuro", futureNodes);
+
+  el.adminSiteTree.append(root, createFlowLine(), quarantine, createFlowLine(), admin, createFlowLine(), future);
+}
+
+function createFlowGroup(title, nodes) {
+  const group = document.createElement("section");
+  group.className = "flow-group";
+
+  const heading = document.createElement("strong");
+  heading.textContent = title;
+
+  const list = document.createElement("div");
+  list.className = "flow-node-list";
+  nodes.forEach((node) => list.appendChild(node));
+
+  group.append(heading, list);
+  return group;
+}
+
+function createFlowNode(title, description, type) {
+  const node = document.createElement("article");
+  node.className = `flow-node ${type}`;
+
+  const marker = document.createElement("span");
+  marker.className = "flow-node-marker";
+
+  const content = document.createElement("div");
+  const titleEl = document.createElement("strong");
+  titleEl.textContent = title;
+
+  const descriptionEl = document.createElement("span");
+  descriptionEl.textContent = description;
+
+  content.append(titleEl, descriptionEl);
+  node.append(marker, content);
+  return node;
+}
+
+function createFlowLine() {
+  const line = document.createElement("span");
+  line.className = "flow-line";
+  return line;
+}
+
+function renderAdminAreaList() {
+  if (!el.adminAreasList) return;
+  el.adminAreasList.textContent = "";
+
+  const quarantine = createAdminAreaCard({
+    id: "quarentena",
+    name: "Quarentena",
+    description: "Controle atual de aeronaves, itens, dashboard e historico.",
+    status: "Ativa",
+    locked: true
+  });
+  el.adminAreasList.appendChild(quarantine);
+
+  dynamicSiteAreas.forEach((area) => {
+    el.adminAreasList.appendChild(createAdminAreaCard({
+      id: area.id,
+      name: area.name,
+      description: area.description || "Area criada para desenvolvimento futuro.",
+      status: "Planejada",
+      locked: false
+    }));
+  });
+}
+
+function createAdminAreaCard(area) {
+  const card = document.createElement("article");
+  card.className = "admin-area-card";
+
+  const label = document.createElement("span");
+  label.textContent = area.status;
+
+  const title = document.createElement("strong");
+  title.textContent = area.name;
+
+  const description = document.createElement("p");
+  description.textContent = area.description;
+
+  const actions = document.createElement("div");
+  actions.className = "admin-card-actions";
+
+  if (!area.locked) {
+    const editButton = createAdminIconButton("edit", "Editar area");
+    editButton.addEventListener("click", () => editAdminArea(area.id));
+
+    const deleteButton = createAdminIconButton("delete", "Excluir area");
+    deleteButton.addEventListener("click", () => deleteAdminArea(area.id));
+
+    actions.append(editButton, deleteButton);
+  } else {
+    const fixed = document.createElement("span");
+    fixed.className = "admin-fixed-label";
+    fixed.textContent = "Modulo fixo";
+    actions.appendChild(fixed);
+  }
+
+  card.append(label, title, description, actions);
+  return card;
+}
+
+function handleCreateAdminArea(event) {
+  event.preventDefault();
+  const name = cleanTextLine(el.adminAreaName?.value || "");
+  const description = cleanTextLine(el.adminAreaDescription?.value || "");
+  const id = slugifyAreaName(name);
+
+  if (!name || !id) {
+    setAdminAreaMessage("Informe o nome da area.", "error");
+    return;
+  }
+
+  const alreadyExists = dynamicSiteAreas.some((area) => area.id === id) || ["tabela", "dashboard", "historico", "admin"].includes(id);
+  if (alreadyExists) {
+    setAdminAreaMessage("Essa area ja existe.", "error");
+    return;
+  }
+
+  const newArea = { id, name, description, createdAt: new Date().toISOString() };
+  dynamicSiteAreas = [...dynamicSiteAreas, newArea];
+  saveStoredAdminAreas();
+  recordAdminHistory("area:create", "Area criada", null, newArea);
+  if (el.adminAreaName) el.adminAreaName.value = "";
+  if (el.adminAreaDescription) el.adminAreaDescription.value = "";
+  setAdminAreaMessage("Area criada.", "info");
+  renderAdminShell();
+}
+
+function editAdminArea(areaId) {
+  const current = dynamicSiteAreas.find((area) => area.id === areaId);
+  if (!current) return;
+
+  const name = cleanTextLine(window.prompt("Nome da area", current.name) || "");
+  if (!name) return;
+
+  const description = cleanTextLine(window.prompt("Descricao da area", current.description || "") || "");
+  const nextId = slugifyAreaName(name);
+  const alreadyExists = dynamicSiteAreas.some((area) => area.id !== areaId && area.id === nextId);
+  if (!nextId || alreadyExists || ["tabela", "dashboard", "historico", "admin"].includes(nextId)) {
+    setAdminAreaMessage("Nao foi possivel editar. Nome invalido ou repetido.", "error");
+    return;
+  }
+
+  const next = { ...current, id: nextId, name, description, updatedAt: new Date().toISOString() };
+  dynamicSiteAreas = dynamicSiteAreas.map((area) => (area.id === areaId ? next : area));
+  saveStoredAdminAreas();
+  recordAdminHistory("area:update", "Area editada", current, next);
+  setAdminAreaMessage("Area editada.", "info");
+  renderAdminShell();
+}
+
+function deleteAdminArea(areaId) {
+  const current = dynamicSiteAreas.find((area) => area.id === areaId);
+  if (!current) return;
+
+  if (!window.confirm(`Excluir a area "${current.name}"?`)) return;
+
+  dynamicSiteAreas = dynamicSiteAreas.filter((area) => area.id !== areaId);
+  saveStoredAdminAreas();
+  recordAdminHistory("area:delete", "Area excluida", current, null);
+  setAdminAreaMessage("Area excluida.", "info");
+  renderAdminShell();
+}
+
+function setAdminAreaMessage(message, type = "info") {
+  if (!el.adminAreaMessage) return;
+  el.adminAreaMessage.textContent = message;
+  el.adminAreaMessage.className = `edit-message ${type}`;
+}
+
+function handleCreateReminder(event) {
+  event.preventDefault();
+  const text = cleanTextLine(el.adminReminderText?.value || "");
+  if (!text) return;
+
+  const newReminder = { id: `reminder-${Date.now()}`, text, done: false };
+  adminReminders = [...adminReminders, newReminder];
+  saveStoredReminders();
+  recordAdminHistory("reminder:create", "Lembrete criado", null, newReminder);
+  if (el.adminReminderText) el.adminReminderText.value = "";
+  renderAdminChecklist();
+  renderAdminHistory();
+}
+
+function renderAdminChecklist() {
+  if (!el.adminChecklist) return;
+  el.adminChecklist.textContent = "";
+
+  adminReminders.forEach((reminder, index) => {
+    const input = document.createElement("input");
+    input.type = "checkbox";
+    input.name = "admin-reminder";
+    input.value = String(index + 1);
+    input.id = `admin-reminder-${reminder.id}`;
+    input.checked = Boolean(reminder.done);
+    input.addEventListener("change", () => {
+      const before = { ...reminder };
+      const after = { ...reminder, done: input.checked };
+      adminReminders = adminReminders.map((item) => (
+        item.id === reminder.id ? after : item
+      ));
+      saveStoredReminders();
+      recordAdminHistory("reminder:update", "Lembrete atualizado", before, after);
+      renderAdminHistory();
+    });
+
+    const label = document.createElement("label");
+    label.htmlFor = input.id;
+    label.textContent = reminder.text;
+
+    const actions = document.createElement("div");
+    actions.className = "reminder-actions";
+
+    const editButton = createAdminIconButton("edit", "Editar lembrete");
+    editButton.addEventListener("click", () => editAdminReminder(reminder.id));
+
+    const deleteButton = createAdminIconButton("delete", "Excluir lembrete");
+    deleteButton.addEventListener("click", () => deleteAdminReminder(reminder.id));
+
+    actions.append(editButton, deleteButton);
+    el.adminChecklist.append(input, label, actions);
+  });
+}
+
+function createAdminIconButton(type, label) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = `admin-icon-action ${type}`;
+  button.setAttribute("aria-label", label);
+  button.title = label;
+
+  const icon = document.createElement("span");
+  icon.className = `admin-action-icon ${type === "edit" ? "icon-pencil" : "icon-trash"}`;
+
+  button.appendChild(icon);
+  return button;
+}
+
+function editAdminReminder(reminderId) {
+  const current = adminReminders.find((reminder) => reminder.id === reminderId);
+  if (!current) return;
+
+  const text = cleanTextLine(window.prompt("Editar lembrete", current.text) || "");
+  if (!text) return;
+
+  const next = { ...current, text, updatedAt: new Date().toISOString() };
+  adminReminders = adminReminders.map((reminder) => (reminder.id === reminderId ? next : reminder));
+  saveStoredReminders();
+  recordAdminHistory("reminder:update", "Lembrete editado", current, next);
+  renderAdminChecklist();
+  renderAdminHistory();
+}
+
+function deleteAdminReminder(reminderId) {
+  const current = adminReminders.find((reminder) => reminder.id === reminderId);
+  if (!current) return;
+
+  if (!window.confirm(`Excluir o lembrete "${current.text}"?`)) return;
+
+  adminReminders = adminReminders.filter((reminder) => reminder.id !== reminderId);
+  saveStoredReminders();
+  recordAdminHistory("reminder:delete", "Lembrete excluido", current, null);
+  renderAdminChecklist();
+  renderAdminHistory();
+}
+
+function loadStoredAdminAreas() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(ADMIN_AREAS_KEY) || "[]");
+    return Array.isArray(parsed) ? parsed.filter((area) => area?.id && area?.name) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveStoredAdminAreas() {
+  localStorage.setItem(ADMIN_AREAS_KEY, JSON.stringify(dynamicSiteAreas));
+}
+
+function loadStoredReminders() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(ADMIN_REMINDERS_KEY) || "null");
+    return Array.isArray(parsed) ? parsed : DEFAULT_ADMIN_REMINDERS;
+  } catch {
+    return DEFAULT_ADMIN_REMINDERS;
+  }
+}
+
+function saveStoredReminders() {
+  localStorage.setItem(ADMIN_REMINDERS_KEY, JSON.stringify(adminReminders));
+}
+
+function loadStoredAdminHistory() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(ADMIN_HISTORY_KEY) || "[]");
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveStoredAdminHistory() {
+  localStorage.setItem(ADMIN_HISTORY_KEY, JSON.stringify(adminHistory));
+}
+
+function recordAdminHistory(action, label, before, after) {
+  adminHistory = [
+    {
+      id: `history-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+      action,
+      label,
+      before: cloneAdminState(before),
+      after: cloneAdminState(after),
+      user: auth.currentUser?.email || "admin",
+      createdAt: new Date().toLocaleString("pt-BR"),
+      reverted: false
+    },
+    ...adminHistory
+  ].slice(0, 60);
+  saveStoredAdminHistory();
+}
+
+function cloneAdminState(value) {
+  return value ? JSON.parse(JSON.stringify(value)) : null;
+}
+
+function renderAdminHistory() {
+  if (!el.adminHistoryList) return;
+  el.adminHistoryList.textContent = "";
+
+  if (!adminHistory.length) {
+    const empty = document.createElement("div");
+    empty.className = "admin-history-empty";
+    empty.textContent = "Nenhuma alteracao administrativa registrada.";
+    el.adminHistoryList.appendChild(empty);
+    return;
+  }
+
+  adminHistory.forEach((entry) => {
+    const item = document.createElement("article");
+    item.className = "admin-history-item";
+
+    const content = document.createElement("div");
+    const title = document.createElement("strong");
+    title.textContent = entry.label;
+
+    const meta = document.createElement("span");
+    meta.textContent = `${entry.createdAt} | ${entry.user}`;
+
+    content.append(title, meta);
+
+    const actions = document.createElement("div");
+    actions.className = "admin-history-actions";
+
+    if (canRevertAdminHistory(entry)) {
+      const revertButton = document.createElement("button");
+      revertButton.type = "button";
+      revertButton.className = "admin-mini-action";
+      revertButton.textContent = "Reverter";
+      revertButton.addEventListener("click", () => revertAdminHistoryEntry(entry.id));
+      actions.appendChild(revertButton);
+    } else {
+      const status = document.createElement("span");
+      status.className = "admin-revert-status";
+      status.textContent = entry.reverted ? "Revertido" : "Registro";
+      actions.appendChild(status);
+    }
+
+    item.append(content, actions);
+    el.adminHistoryList.appendChild(item);
+  });
+}
+
+function canRevertAdminHistory(entry) {
+  return !entry.reverted && ["area:update", "area:delete", "reminder:update", "reminder:delete"].includes(entry.action);
+}
+
+function revertAdminHistoryEntry(historyId) {
+  const entry = adminHistory.find((item) => item.id === historyId);
+  if (!entry || !canRevertAdminHistory(entry)) return;
+
+  if (entry.action.startsWith("area:")) {
+    revertAreaHistory(entry);
+  }
+
+  if (entry.action.startsWith("reminder:")) {
+    revertReminderHistory(entry);
+  }
+
+  adminHistory = adminHistory.map((item) => (
+    item.id === historyId ? { ...item, reverted: true } : item
+  ));
+  saveStoredAdminHistory();
+  renderAdminShell();
+}
+
+function revertAreaHistory(entry) {
+  if (entry.action === "area:update" && entry.before) {
+    dynamicSiteAreas = dynamicSiteAreas.map((area) => (
+      area.id === entry.after?.id || area.id === entry.before?.id ? entry.before : area
+    ));
+  }
+
+  if (entry.action === "area:delete" && entry.before) {
+    const exists = dynamicSiteAreas.some((area) => area.id === entry.before.id);
+    if (!exists) dynamicSiteAreas = [...dynamicSiteAreas, entry.before];
+  }
+
+  saveStoredAdminAreas();
+}
+
+function revertReminderHistory(entry) {
+  if (entry.action === "reminder:update" && entry.before) {
+    adminReminders = adminReminders.map((reminder) => (
+      reminder.id === entry.before.id ? entry.before : reminder
+    ));
+  }
+
+  if (entry.action === "reminder:delete" && entry.before) {
+    const exists = adminReminders.some((reminder) => reminder.id === entry.before.id);
+    if (!exists) adminReminders = [...adminReminders, entry.before];
+  }
+
+  saveStoredReminders();
+}
+
+function getDynamicAreaTabId(areaId) {
+  return `area-${areaId}`;
+}
+
+function slugifyAreaName(value) {
+  return normalizeText(value)
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+}
 
 async function adicionarItem(e) {
   e.preventDefault();
@@ -1256,14 +2001,21 @@ function gerarGrafico() {
 }
 
 window.showTab = function (tab) {
+  if (tab === "admin" && !adminUnlocked) {
+    openAdminGate();
+    return;
+  }
+
   document.querySelectorAll(".tab").forEach((t) => t.classList.remove("active"));
   document.getElementById(tab)?.classList.add("active");
   document.querySelectorAll("[data-tab-target]").forEach((button) => {
     button.classList.toggle("active", button.dataset.tabTarget === tab);
+    button.classList.toggle("is-selected", button.dataset.tabTarget === tab);
   });
   if (tab === "dashboard") gerarGrafico();
   if (tab === "historico") renderHistorico();
   if (tab === "tabela") renderTable();
+  if (tab === "admin") renderAdminPanel();
 };
 
 function validarCampos() {
