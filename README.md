@@ -36,15 +36,27 @@ A verão atual da aplicação é a 0.2, atualizado no dia 01/06/2026.
 
 ## Versão - 0.3
 
-
-
 - Em desenvolvimento.
 
 
 
+
+FireBase
+
+O Firebase oferece um plano gratuito chamado Spark, que pode ser usado sem cartão de crédito e sem prazo de expiração. Ele funciona com limites de uso mensais/diários, ideal para projetos pessoais, protótipos e apps em fase inicial.
+
+Maximo de ações no plano gratuito
+
+1 GB de armazenamento
+50.000 leituras por dia
+20.000 gravações por dia
+20.000 exclusões por dia
+~10 GB de transferência de dados/mês
+
+
 ## Authors
 
-- [@octokatherine](https://www.github.com/shelby10202)
+- [@Shelby10202](https://www.github.com/shelby10202)
 
 
 
