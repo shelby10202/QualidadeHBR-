@@ -3,12 +3,14 @@ import { getFirestore, collection, addDoc, getDocs, deleteDoc, doc, updateDoc, s
 import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyAZ6gOO32DstTL9LPSgtYYa3Jptq_8QNrs",
-  authDomain: "quarentena-39458.firebaseapp.com",
-  projectId: "quarentena-39458",
-  storageBucket: "quarentena-39458.firebasestorage.app",
-  messagingSenderId: "200343768046",
-  appId: "1:200343768046:web:86905492b62c2fa7049cff"
+  apiKey: "AIzaSyBXlMI80-pn07-RIuDlhWcpDxb6vp3YPfg",
+  authDomain: "qualidade-hbr1.firebaseapp.com",
+  databaseURL: "https://qualidade-hbr1-default-rtdb.firebaseio.com",
+  projectId: "qualidade-hbr1",
+  storageBucket: "qualidade-hbr1.firebasestorage.app",
+  messagingSenderId: "673132755158",
+  appId: "1:673132755158:web:8773887b98fb5c66447177",
+  measurementId: "G-5S21L54P0D"
 };
 
 const app = initializeApp(firebaseConfig);
