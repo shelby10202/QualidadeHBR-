@@ -1,0 +1,36 @@
+{
+  "functions": [
+    {
+      "source": "functions",
+      "codebase": "default",
+      "ignore": [
+        "node_modules",
+        ".git",
+        "firebase-debug.log",
+        "firebase-debug.*.log"
+      ]
+    }
+  ],
+  "hosting": {
+    "public": "C:\\Users\\rapha_x81c37l\\Desktop\\HBR QUARENTENA",
+    "ignore": [
+      "firebase.json",
+      "functions/**",
+      "**/.*",
+      "**/node_modules/**"
+    ],
+    "rewrites": [
+      {
+        "source": "/api/run-ad-search",
+        "function": {
+          "functionId": "runAdSearchNow",
+          "region": "southamerica-east1"
+        }
+      },
+      {
+        "source": "**",
+        "destination": "/index.html"
+      }
+    ]
+  }
+}

@@ -1,7 +1,7 @@
 # Qualidade
 ## HBRQ
 
-Qualidade é um repertório criado inicialmente para atender a demanda de saídas de peças aeronáuticas do HBR, o projeto é inicialmente hospedado no FrontEnd do próprio GitHub com conexão para o Firebase. 
+Quarentena é um repertório criado inicialmente para atender a demanda de saídas de peças aeronáuticas do HBR, o projeto é inicialmente hospedado no FrontEnd do próprio GitHub com conexão para o Firebase. 
 
 A verão atual da aplicação é a 0.2, atualizado no dia 01/06/2026.
 
@@ -36,10 +36,8 @@ A verão atual da aplicação é a 0.2, atualizado no dia 01/06/2026.
 
 ## Versão - 0.3
 
-- Criação do setor de Publicações
-- Pesquisa AD
-- Notificação de AD
-- Rede neural da documentação interna
+- Em desenvolvimento.
+
 
 -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 

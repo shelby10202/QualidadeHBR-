@@ -10,6 +10,7 @@
 <link rel="stylesheet" href="style.css">
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 </head>
 
 <body>
@@ -51,6 +52,13 @@
 </div>
 
 <div class="app-shell">
+  <input type="checkbox" id="checkbox" class="sidebar-toggle-check" aria-label="Abrir ou fechar barra lateral">
+  <label for="checkbox" class="toggle sidebar-hamburger" title="Abrir ou fechar menu">
+    <div class="bar bar--top"></div>
+    <div class="bar bar--middle"></div>
+    <div class="bar bar--bottom"></div>
+  </label>
+
   <aside class="sidebar sidebar-tree-shell">
     <div class="sidebar-brand">
       <img class="brand-logo" src="assets/hbr-logo.png" alt="HBR">
@@ -59,7 +67,7 @@
       </div>
     </div>
 
-    <nav class="tree-container sidebar-tree" aria-label="Navegacao principal">
+    <nav class="tree-container sidebar-tree" aria-label="Navegação principal">
       <ul>
         <li class="tree-item">
           <input type="checkbox" id="folder-hbr" class="tree-toggle" checked>
@@ -86,7 +94,7 @@
                     <path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 2H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"></path>
                     <path d="M2 10h20"></path>
                   </svg>
-                  Quarentena
+                  Qualidade
                 </label>
 
                 <div class="tree-children-wrapper">
@@ -115,7 +123,7 @@
                           <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"></path>
                           <polyline points="14 2 14 8 20 8"></polyline>
                         </svg>
-                        Historico
+                        Histórico
                       </button>
                     </li>
                   </ul>
@@ -123,8 +131,8 @@
               </li>
 
               <li class="tree-item">
-                <input type="checkbox" id="folder-novas-areas" class="tree-toggle" checked>
-                <label for="folder-novas-areas" class="tree-label tree-section-label">
+                <input type="checkbox" id="folder-publicacoes" class="tree-toggle" checked>
+                <label for="folder-publicacoes" class="tree-label tree-section-label">
                   <svg class="icon folder-closed-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 2H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"></path>
                   </svg>
@@ -132,10 +140,38 @@
                     <path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 2H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"></path>
                     <path d="M2 10h20"></path>
                   </svg>
-                  Novas areas
+                  Publicações
                 </label>
                 <div class="tree-children-wrapper">
-                  <ul id="sidebarDynamicAreas" class="tree-children dynamic-area-branch"></ul>
+                  <ul class="tree-children">
+                    <li class="tree-item">
+                      <button type="button" class="file-item" data-tab-target="publicacoes" onclick="showTab('publicacoes')">
+                        <svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                          <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"></path>
+                          <polyline points="14 2 14 8 20 8"></polyline>
+                        </svg>
+                        Rede técnica
+                      </button>
+                    </li>
+                    <li class="tree-item">
+                      <button type="button" class="file-item" data-tab-target="adPesquisa" onclick="showTab('adPesquisa')">
+                        <svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                          <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"></path>
+                          <polyline points="14 2 14 8 20 8"></polyline>
+                        </svg>
+                        Pesquisa de ADs
+                      </button>
+                    </li>
+                    <li class="tree-item">
+                      <button type="button" class="file-item" data-tab-target="adNotificacoes" onclick="showTab('adNotificacoes')">
+                        <svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                          <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"></path>
+                          <polyline points="14 2 14 8 20 8"></polyline>
+                        </svg>
+                        Notificações de AD
+                      </button>
+                    </li>
+                  </ul>
                 </div>
               </li>
             </ul>
@@ -146,7 +182,7 @@
 
     <div class="sidebar-user">
       <div class="sidebar-user-info">
-        <span>Usuario</span>
+        <span>Usuário</span>
         <strong id="userEmail">...</strong>
       </div>
       <button type="button" id="adminAccessBtn" class="playstore-button admin-access-btn">
@@ -239,12 +275,12 @@
         <div class="dashboard-topbar">
           <div>
             <p class="eyebrow">Dashboard</p>
-            <h1>Quarentena e saidas</h1>
+            <h1>Quarentena e saídas</h1>
           </div>
 
           <div class="dashboard-total">
             <span id="metric_total_saidas">0</span>
-            <small>pecas sairam</small>
+            <small>peças saíram</small>
           </div>
         </div>
 
@@ -260,7 +296,7 @@
           <article class="metric-card metric-saidas">
             <div class="metric-icon">S</div>
             <div>
-              <span>Saidas registradas</span>
+              <span>Saídas registradas</span>
               <strong id="metric_saidas_card">0</strong>
             </div>
           </article>
@@ -276,7 +312,7 @@
           <article class="metric-card metric-pendentes">
             <div class="metric-icon">A</div>
             <div>
-              <span>Ainda sem saida</span>
+              <span>Ainda sem saída</span>
               <strong id="metric_sem_saida">0</strong>
             </div>
           </article>
@@ -319,18 +355,261 @@
 
     </section>
 
+    <section id="publicacoes" class="tab">
+      <div class="publications-page">
+        <div class="page-heading">
+          <div>
+            <p class="eyebrow">Publicações técnicas</p>
+            <h1>Rede de documentos</h1>
+            <p class="page-subtitle">FQs, ITs e PRQs ligados para prever impacto de alterações nos setores.</p>
+          </div>
+
+          <div class="total-pill">
+            <span id="publicationTotalNodes">0</span>
+            <small>documentos</small>
+          </div>
+        </div>
+
+        <div id="publicationShell" class="publications-shell">
+          <section class="publication-network-card">
+            <div class="publication-network-head">
+              <div>
+                <span>Rede neural</span>
+                <strong id="publicationNetworkTitle">Impacto documental</strong>
+              </div>
+              <div class="publication-head-actions">
+                <button type="button" id="publicationResetViewBtn" class="publication-ghost-btn">Reorganizar</button>
+                <button type="button" id="publicationMenuBtn" class="publication-menu-btn" aria-label="Abrir menu de Publicações" aria-expanded="false">
+                  <span></span>
+                  <span></span>
+                  <span></span>
+                </button>
+              </div>
+            </div>
+
+            <div id="publicationCanvas" class="publication-canvas" aria-label="Rede de documentos técnicos">
+              <svg id="publicationLinks" class="publication-links" aria-hidden="true"></svg>
+              <div id="publicationNodes" class="publication-nodes"></div>
+            </div>
+          </section>
+
+          <aside class="publication-control-panel">
+            <details open>
+              <summary>Informações</summary>
+              <div id="publicationInfoPanel" class="publication-info-panel"></div>
+            </details>
+
+            <details open>
+              <summary>Filtros</summary>
+              <label class="publication-search">
+                <span>Pesquisar</span>
+                <input id="publicationSearch" class="input-custom" type="search" placeholder="Buscar FQ, IT, PRQ ou setor">
+              </label>
+
+              <div class="publication-toggle-list">
+                <label><input id="publicationFilterFq" type="checkbox" checked> FQ</label>
+                <label><input id="publicationFilterIt" type="checkbox" checked> IT</label>
+                <label><input id="publicationFilterPrq" type="checkbox" checked> PRQ</label>
+              </div>
+            </details>
+
+            <details open>
+              <summary>Células</summary>
+              <form id="publicationNodeForm" class="publication-form">
+                <select id="publicationType" class="input-custom">
+                  <option value="FQ">FQ</option>
+                  <option value="IT">IT</option>
+                  <option value="PRQ">PRQ</option>
+                </select>
+                <input id="publicationCode" class="input-custom" placeholder="Código do documento">
+                <input id="publicationTitle" class="input-custom" placeholder="Nome do documento">
+                <input id="publicationSector" class="input-custom" placeholder="Setor responsável">
+                <select id="publicationLinkTo" class="input-custom"></select>
+                <button type="submit" class="modal-action">Adicionar célula</button>
+              </form>
+            </details>
+
+            <details open>
+              <summary>Relações</summary>
+              <div class="publication-relation-form">
+                <select id="publicationSource" class="input-custom"></select>
+                <select id="publicationTarget" class="input-custom"></select>
+                <button type="button" id="publicationAddLinkBtn" class="modal-action">Linkar documentos</button>
+                <button type="button" id="publicationDeleteSelectedBtn" class="publication-danger-btn">Excluir seleção</button>
+              </div>
+            </details>
+
+            <details open>
+              <summary>Tela</summary>
+              <label class="publication-range">
+                <span>Intensidade das células</span>
+                <input id="publicationIntensity" type="range" min="40" max="100" value="82">
+              </label>
+              <label class="publication-range">
+                <span>Tamanho das células</span>
+                <input id="publicationNodeSize" type="range" min="44" max="86" value="62">
+              </label>
+              <label class="publication-range">
+                <span>Espessura dos links</span>
+                <input id="publicationLineWidth" type="range" min="1" max="8" value="3">
+              </label>
+              <label class="publication-switch">
+                <span>Rótulos</span>
+                <input id="publicationLabelsToggle" type="checkbox" checked>
+              </label>
+              <button type="button" id="publicationAnimateBtn" class="modal-action">Animar</button>
+            </details>
+          </aside>
+        </div>
+      </div>
+    </section>
+
+    <section id="adPesquisa" class="tab">
+      <div class="ad-page">
+        <div class="page-heading">
+          <div>
+            <p class="eyebrow">Publicações técnicas</p>
+            <h1>Pesquisa de ADs</h1>
+            <p class="page-subtitle">Monitoramento de FAA, EASA e ANAC usando a EO fixa da HBR Osasco.</p>
+          </div>
+
+          <div class="total-pill">
+            <span id="adTotalFindings">0</span>
+            <small>achados</small>
+          </div>
+        </div>
+
+        <div class="ad-control-strip">
+          <div>
+            <span>Última busca</span>
+            <strong id="adLastRun">Aguardando</strong>
+          </div>
+          <div>
+            <span>Próxima busca</span>
+            <strong id="adNextRun">A cada 4 horas</strong>
+          </div>
+          <div>
+            <span>Relatórios</span>
+            <strong id="adReportCount">0 gerados</strong>
+          </div>
+          <button type="button" id="adRefreshBtn" class="modal-action">Atualizar agora</button>
+        </div>
+
+        <div class="ad-grid">
+          <article class="ad-panel ad-source-panel">
+            <div class="ad-panel-head">
+              <span>Fontes oficiais</span>
+              <strong>Rotina de pesquisa</strong>
+            </div>
+            <div id="adSourceList" class="ad-source-list"></div>
+          </article>
+
+          <article class="ad-panel ad-results-panel">
+            <div class="ad-panel-head">
+              <span>ADs encontradas</span>
+              <strong>Resultado consolidado</strong>
+            </div>
+            <div class="ad-filter-row">
+              <input id="adSearchFilter" class="input-custom" type="search" placeholder="Filtrar por fabricante, modelo, motor ou assunto">
+              <select id="adLineFilter" class="input-custom">
+                <option value="all">Todas as linhas</option>
+                <option value="AIRBUS">Airbus / Helibras</option>
+                <option value="BELL">Bell</option>
+                <option value="LEONARDO">Leonardo</option>
+                <option value="ROBINSON">Robinson</option>
+              </select>
+              <select id="adDateSort" class="input-custom">
+                <option value="newest">Mais recentes</option>
+                <option value="oldest">Mais antigas</option>
+                <option value="effective-newest">Efetivas recentes</option>
+                <option value="effective-oldest">Efetivas antigas</option>
+              </select>
+            </div>
+            <div id="adResultsList" class="ad-results-list"></div>
+          </article>
+
+          <article class="ad-panel ad-report-panel">
+            <div class="ad-panel-head">
+              <span>Relatórios</span>
+              <strong>Diário e semanal</strong>
+            </div>
+            <div class="ad-report-actions">
+              <button type="button" id="adDailyReportBtn" class="modal-action secondary">Gerar diário</button>
+              <button type="button" id="adWeeklyReportBtn" class="modal-action secondary">Gerar semanal</button>
+            </div>
+            <div id="adReportsList" class="ad-reports-list"></div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section id="adNotificacoes" class="tab">
+      <div class="ad-page ad-notification-page">
+        <div class="page-heading">
+          <div>
+            <p class="eyebrow">Publicações técnicas</p>
+            <h1>Notificações de AD</h1>
+            <p class="page-subtitle">Alertas gerados a partir da lista consolidada de ADs e dos motores por linha.</p>
+          </div>
+
+          <div class="total-pill">
+            <span id="adNotificationTotal">0</span>
+            <small>alertas</small>
+          </div>
+        </div>
+
+        <div class="ad-control-strip ad-notification-strip">
+          <div>
+            <span>Mandatórias</span>
+            <strong id="adNotificationMandatory">0</strong>
+          </div>
+          <div>
+            <span>Propostas</span>
+            <strong id="adNotificationProposal">0</strong>
+          </div>
+          <label class="ad-notification-control">
+            <span>Linha</span>
+            <select id="adNotificationLineFilter" class="input-custom">
+              <option value="all">Todas as linhas</option>
+              <option value="AIRBUS">Airbus / Helibras</option>
+              <option value="BELL">Bell</option>
+              <option value="LEONARDO">Leonardo</option>
+              <option value="ROBINSON">Robinson</option>
+            </select>
+          </label>
+          <label class="ad-notification-control">
+            <span>Organizar</span>
+            <select id="adNotificationDateSort" class="input-custom">
+              <option value="newest">Mais recentes</option>
+              <option value="oldest">Mais antigas</option>
+              <option value="effective-newest">Efetivas recentes</option>
+              <option value="effective-oldest">Efetivas antigas</option>
+            </select>
+          </label>
+        </div>
+
+        <article class="ad-panel ad-notification-panel">
+          <div class="ad-panel-head">
+            <span>Lista de alertas</span>
+            <strong>ADs monitoradas</strong>
+          </div>
+          <div id="adNotificationsList" class="ad-notifications-list"></div>
+        </article>
+      </div>
+    </section>
+
     <section id="admin" class="tab">
       <div class="admin-page">
         <div class="page-heading">
           <div>
             <p class="eyebrow">Admin</p>
             <h1>Painel administrativo</h1>
-            <p class="page-subtitle">Mapa estrutural, novas areas e lembretes.</p>
+            <p class="page-subtitle">Mapa estrutural, conexões de dados e lembretes.</p>
           </div>
 
           <div class="total-pill">
-            <span id="adminAreaCount">1</span>
-            <small>areas</small>
+            <span id="adminAreaCount">5</span>
+            <small>módulos</small>
           </div>
         </div>
 
@@ -338,45 +617,100 @@
           <article class="admin-panel admin-tree-panel">
             <div class="admin-panel-head">
               <span>Estrutura</span>
-              <strong>Ramificacoes do site</strong>
+              <strong>Ramificações do site</strong>
             </div>
             <div id="adminSiteTree" class="site-map-tree"></div>
           </article>
 
-          <article class="admin-panel">
+          <article class="admin-panel ad-admin-scope-panel">
             <div class="admin-panel-head">
-              <span>Expansao</span>
-              <strong>Criar nova area</strong>
+              <span>Escopo fixo</span>
+              <strong>EO HBR Aviação - Osasco</strong>
+            </div>
+            <div id="adScopeSummary" class="ad-scope-summary"></div>
+          </article>
+
+          <article class="admin-panel publication-admin-panel">
+            <div class="admin-panel-head">
+              <span>Publicações</span>
+              <strong>Rede técnica</strong>
             </div>
 
-            <form id="adminAreaForm" class="admin-area-form">
-              <label>
-                <span>Nome da area</span>
-                <input id="adminAreaName" class="input-custom" placeholder="Ex.: Engenharia">
-              </label>
+            <p class="publication-admin-copy">A rede de documentos mostra relações entre FQs, ITs e PRQs, enquanto a pesquisa de ADs monitora FAA, EASA e ANAC pelo escopo da EO HBR.</p>
+            <div class="document-import-actions">
+              <button type="button" class="modal-action secondary" onclick="showTab('publicacoes')">Abrir rede</button>
+              <button type="button" class="modal-action" onclick="showTab('adPesquisa')">Abrir pesquisa</button>
+              <button type="button" class="modal-action secondary" onclick="showTab('adNotificacoes')">Abrir notificações</button>
+            </div>
+          </article>
 
-              <label>
-                <span>Descricao</span>
-                <textarea id="adminAreaDescription" class="input-custom" placeholder="Objetivo da area"></textarea>
-              </label>
+          <article class="admin-panel document-import-panel">
+            <div class="admin-panel-head">
+              <span>Entrada de dados</span>
+              <strong>Excel para rede de documentos</strong>
+            </div>
 
-              <button type="submit" class="modal-action">Criar area</button>
-              <p id="adminAreaMessage" class="edit-message"></p>
-            </form>
+            <div class="document-import-layout">
+              <section class="document-import-card">
+                <label class="document-file-drop">
+                  <span>Arquivo Excel</span>
+                  <strong>Selecionar base documental</strong>
+                  <input id="documentImportFile" type="file" accept=".xlsx,.xls,.csv">
+                </label>
+
+                <div class="document-range-grid">
+                  <label>
+                    <span>Aba</span>
+                    <select id="documentImportSheet" class="input-custom"></select>
+                  </label>
+                  <label>
+                    <span>Linha de cabeçalho</span>
+                    <input id="documentImportHeaderRow" class="input-custom" type="number" min="1" value="1">
+                  </label>
+                  <label>
+                    <span>Linha inicial</span>
+                    <input id="documentImportStartRow" class="input-custom" type="number" min="2" value="2">
+                  </label>
+                  <label>
+                    <span>Linha final</span>
+                    <input id="documentImportEndRow" class="input-custom" type="number" min="2" placeholder="Até o fim">
+                  </label>
+                </div>
+              </section>
+
+              <section class="document-import-card">
+                <div class="document-import-subhead">
+                  <span>Colunas usadas</span>
+                  <strong>Mapeamento dos campos</strong>
+                </div>
+                <div id="documentImportMapping" class="document-mapping-grid"></div>
+              </section>
+            </div>
+
+            <div class="document-import-summary">
+              <div id="documentImportStats" class="document-import-stats"></div>
+              <div class="document-import-actions">
+                <button type="button" id="documentImportClearBtn" class="modal-action secondary">Limpar</button>
+                <button type="button" id="documentImportApplyBtn" class="modal-action">Gerar rede</button>
+              </div>
+            </div>
+
+            <div id="documentImportPreview" class="document-preview-table"></div>
+            <p id="documentImportMessage" class="edit-message"></p>
           </article>
 
           <article class="admin-panel admin-users-panel">
             <div class="admin-panel-head">
-              <span>Usuarios</span>
-              <strong>Ultima vez online</strong>
+              <span>Usuários</span>
+              <strong>Última vez online</strong>
             </div>
             <div id="adminUsersList" class="admin-users-list"></div>
           </article>
 
           <article class="admin-panel admin-wide-panel">
             <div class="admin-panel-head">
-              <span>Areas</span>
-              <strong>Modulos cadastrados</strong>
+              <span>Módulos</span>
+              <strong>Áreas fixas do site</strong>
             </div>
             <div id="adminAreasList" class="admin-areas-list"></div>
           </article>
@@ -399,8 +733,8 @@
 
           <article class="admin-panel admin-history-panel">
             <div class="admin-panel-head">
-              <span>Historico</span>
-              <strong>Alteracoes do Admin</strong>
+              <span>Histórico</span>
+              <strong>Alterações do Admin</strong>
             </div>
             <div id="adminHistoryList" class="admin-history-list"></div>
           </article>
@@ -415,7 +749,7 @@
     <div class="notiglow"></div>
     <div class="notiborderglow"></div>
 
-    <button type="button" id="editCloseBtn" class="modal-close" aria-label="Fechar edicao">x</button>
+    <button type="button" id="editCloseBtn" class="modal-close" aria-label="Fechar edição">x</button>
 
     <div class="notititle">Editar aeronave</div>
     <div class="notibody">
@@ -483,6 +817,28 @@
   </form>
 </div>
 
+<div id="adDetailModal" class="edit-modal" hidden>
+  <article class="notification ad-detail-notification">
+    <div class="notiglow"></div>
+    <div class="notiborderglow"></div>
+
+    <button type="button" id="adDetailCloseBtn" class="modal-close" aria-label="Fechar relatório">x</button>
+
+    <div class="notititle" id="adDetailTitle">Relatório da AD</div>
+    <div class="notibody">
+      <strong id="adDetailDocument">AD</strong>
+      <span id="adDetailMeta">Autoridade, data e tipo</span>
+    </div>
+
+    <div id="adDetailContent" class="ad-detail-content"></div>
+
+    <div class="edit-actions">
+      <button type="button" id="adDetailCancelBtn" class="modal-action secondary">Fechar</button>
+      <a id="adDetailSourceLink" class="modal-action ad-detail-source-link" href="#" target="_blank" rel="noopener">Abrir registro</a>
+    </div>
+  </article>
+</div>
+
 <script src="quarantine-data.js"></script>
 <script type="module">
   const loginMessage = document.getElementById("loginMessage");
@@ -490,7 +846,7 @@
   import("./script.js").catch((err) => {
     console.error(err);
     if (loginMessage) {
-      loginMessage.textContent = "Erro ao carregar o login. Verifique a internet e tente recarregar a pagina.";
+      loginMessage.textContent = "Erro ao carregar o login. Verifique a internet e tente recarregar a página.";
       loginMessage.classList.add("error");
     }
   });
