@@ -36,8 +36,10 @@ A verão atual da aplicação é a 0.2, atualizado no dia 01/06/2026.
 
 ## Versão - 0.3
 
-- Em desenvolvimento.
-
+- Criação do setor de Publicações
+- Pesquisa AD
+- Notificação de AD
+- Rede neural da documentação interna
 
 -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
