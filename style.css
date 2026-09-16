@@ -2923,8 +2923,7 @@ button {
 .publications-page {
   height: calc(100vh - 92px);
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
-  gap: 16px;
+  grid-template-rows: minmax(0, 1fr);
 }
 
 .publications-shell {
@@ -2959,9 +2958,31 @@ button {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
   gap: 12px;
   padding: 14px 16px;
   border-bottom: 1px solid var(--line);
+}
+
+.publication-head-total {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  color: #cbd5e1;
+  margin-right: auto;
+  padding-left: 12px;
+  border-left: 1px solid var(--line);
+}
+
+.publication-head-total span {
+  font-size: 20px;
+  font-weight: 800;
+  color: #fff;
+}
+
+.publication-head-total small {
+  font-size: 12px;
+  color: #9aa3af;
 }
 
 .publication-head-actions {
