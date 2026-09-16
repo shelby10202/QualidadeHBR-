@@ -3599,8 +3599,20 @@ function normalizePublicationNode(node) {
   const title = cleanTextLine(node?.title || "");
   if (!type || !code || !title) return null;
 
+  const id = cleanTextLine(node.id || slugifyAreaName(`${type}-${code}`));
+  // node.x/node.y podem vir corrompidos de uma versão anterior salva no
+  // localStorage (ex.: NaN). clampNumber joga valores inválidos para o limite
+  // mínimo do campo — o que, com um campo simétrico, é literalmente o canto
+  // superior esquerdo, empilhando todo nó corrompido no mesmo ponto. Em vez
+  // disso, um nó inválido cai numa posição espalhada (derivada do próprio id)
+  // em vez de colapsar no canto.
+  const rawX = Number(node.x);
+  const rawY = Number(node.y);
+  const hasValidPosition = Number.isFinite(rawX) && Number.isFinite(rawY);
+  const fallbackAngle = (getPublicationNodeSeed(id) / 97) * Math.PI * 2;
+
   return {
-    id: cleanTextLine(node.id || slugifyAreaName(`${type}-${code}`)),
+    id,
     type,
     code,
     title,
@@ -3613,8 +3625,12 @@ function normalizePublicationNode(node) {
     sourceFile: cleanTextLine(node.sourceFile || ""),
     sourceSheet: cleanTextLine(node.sourceSheet || ""),
     sourceRow: Number(node.sourceRow || 0),
-    x: clampNumber(Number(node.x), PUBLICATION_FIELD_MIN, PUBLICATION_FIELD_MAX),
-    y: clampNumber(Number(node.y), PUBLICATION_FIELD_MIN, PUBLICATION_FIELD_MAX)
+    x: hasValidPosition
+      ? clampNumber(rawX, PUBLICATION_FIELD_MIN, PUBLICATION_FIELD_MAX)
+      : clampNumber(50 + Math.cos(fallbackAngle) * 30, PUBLICATION_FIELD_MIN, PUBLICATION_FIELD_MAX),
+    y: hasValidPosition
+      ? clampNumber(rawY, PUBLICATION_FIELD_MIN, PUBLICATION_FIELD_MAX)
+      : clampNumber(52 + Math.sin(fallbackAngle) * 30, PUBLICATION_FIELD_MIN, PUBLICATION_FIELD_MAX)
   };
 }
 
