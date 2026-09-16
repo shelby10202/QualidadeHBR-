@@ -2845,7 +2845,8 @@ function initPublicationNetwork() {
   // A rede fica em localStorage para permitir ajustes rápidos sem alterar o código.
   syncPublicationControls();
   renderPublicationNetwork();
-  if (document.getElementById("publicacoes")?.classList.contains("active")) startPublicationFloat();
+  // Os nós ficam parados por padrão (só se movem ao arrastar ou ao clicar em
+  // "Animar"); não inicia a deriva contínua sozinha.
 }
 
 function togglePublicationMenu() {
@@ -3152,7 +3153,6 @@ function resetPublicationLayout() {
   savePublicationNetwork();
   syncPublicationPhysicsState();
   renderPublicationNetwork();
-  startPublicationFloat();
 }
 
 function animatePublicationNetwork() {
@@ -3173,7 +3173,10 @@ function animatePublicationNetwork() {
   publicationAnimationFrame = window.setTimeout(() => {
     publicationAnimationFrame = null;
     el.publicationCanvas?.classList.remove("is-animating");
-  }, 1200);
+    // Os nós ficam fixos por padrão: a deriva contínua roda só enquanto dura
+    // o impulso do botão "Animar" e para sozinha em seguida.
+    stopPublicationFloat();
+  }, 1800);
   startPublicationFloat();
 }
 
@@ -5838,7 +5841,6 @@ window.showTab = function (tab) {
   if (tab === "adNotificacoes") renderAdNotifications();
   if (tab === "publicacoes") {
     renderPublicationNetwork();
-    startPublicationFloat();
   } else {
     stopPublicationFloat();
   }
