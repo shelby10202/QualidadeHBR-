@@ -676,6 +676,9 @@ let publicationFloatFrame = null;
 let publicationFloatLastTime = 0;
 let publicationDraggedNodeId = null;
 let publicationPhysicsNodes = new Map();
+// Elementos <line> já anexados ao SVG, indexados por link, reaproveitados a cada
+// frame de animação (evita recriar centenas/milhares de elementos 60x por segundo).
+let publicationLinkElements = new Map();
 let documentImportState = createEmptyDocumentImportState();
 let adMonitorState = loadStoredAdMonitorState();
 let adReports = loadStoredAdReports();
@@ -1464,6 +1467,10 @@ function createPublicationNodesFromDocumentRows(documents) {
   });
 }
 
+// Suporta redes grandes (milhares de documentos): indexa por setor em vez de
+// comparar cada nó com todos os outros (O(n) em vez de O(n²)).
+const PUBLICATION_LINKS_MAX_PER_NODE = 20;
+
 function createPublicationLinksFromDocumentRows(nodes) {
   const links = [];
   const seen = new Set();
@@ -1476,30 +1483,25 @@ function createPublicationLinksFromDocumentRows(nodes) {
     links.push({ from, to });
   };
 
-  nodes.forEach((source) => {
-    const sourceAdjacent = splitDocumentImportList(source.adjacentSector).map(normalizeSpreadsheetFieldName);
-    const sourceSector = normalizeSpreadsheetFieldName(source.sector);
+  const bySector = new Map();
+  nodes.forEach((node) => {
+    const key = normalizeSpreadsheetFieldName(node.sector || "Publicações");
+    if (!bySector.has(key)) bySector.set(key, []);
+    bySector.get(key).push(node);
+  });
 
-    nodes.forEach((target) => {
-      if (source.id === target.id) return;
-
-      const targetSector = normalizeSpreadsheetFieldName(target.sector);
-      const targetAdjacent = splitDocumentImportList(target.adjacentSector).map(normalizeSpreadsheetFieldName);
-
-      if (sourceAdjacent.includes(targetSector) || targetAdjacent.includes(sourceSector)) {
-        addLink(source.id, target.id);
-      }
+  nodes.forEach((node) => {
+    const adjacentSectors = splitDocumentImportList(node.adjacentSector).map(normalizeSpreadsheetFieldName);
+    adjacentSectors.forEach((sectorKey) => {
+      const targets = bySector.get(sectorKey);
+      if (!targets) return;
+      // Limita conexões por nó: um documento não precisa (nem é útil visualmente)
+      // linkar com centenas de outros do mesmo setor.
+      targets.slice(0, PUBLICATION_LINKS_MAX_PER_NODE).forEach((target) => addLink(node.id, target.id));
     });
   });
 
   if (!links.length) {
-    const bySector = nodes.reduce((map, node) => {
-      const key = normalizeSpreadsheetFieldName(node.sector || "Publicações");
-      if (!map.has(key)) map.set(key, []);
-      map.get(key).push(node);
-      return map;
-    }, new Map());
-
     bySector.forEach((group) => {
       group.slice(1).forEach((node) => addLink(group[0].id, node.id));
     });
@@ -2851,9 +2853,8 @@ function renderPublicationNetwork() {
   el.publicationCanvas.style.setProperty("--publication-cell-intensity", `${publicationConfig.intensity / 100}`);
   el.publicationCanvas.classList.toggle("hide-labels", !publicationConfig.showLabels);
 
-  el.publicationLinks.textContent = "";
   el.publicationLinks.setAttribute("viewBox", `0 0 ${width} ${height}`);
-  links.forEach((link) => drawPublicationLink(link, width, height));
+  rebuildPublicationLinkElements(links, width, height);
 
   el.publicationNodes.textContent = "";
   visibleNodes.forEach((node) => el.publicationNodes.appendChild(createPublicationNodeElement(node)));
@@ -2862,21 +2863,40 @@ function renderPublicationNetwork() {
   renderPublicationInfoPanel();
 }
 
-function drawPublicationLink(link, width, height) {
-  const source = getPublicationNode(link.from);
-  const target = getPublicationNode(link.to);
-  if (!source || !target) return;
+function getPublicationLinkKey(link) {
+  return `${link.from}::${link.to}`;
+}
+
+// Reconstrói os elementos <line> do zero (usado quando a topologia, os filtros
+// ou o estilo mudam). O loop de animação NÃO passa por aqui: ele reaproveita os
+// elementos já criados via updatePublicationLinkPosition, o que evita recriar
+// milhares de nós SVG a cada um dos 60 frames por segundo.
+function rebuildPublicationLinkElements(links, width, height) {
+  el.publicationLinks.textContent = "";
+  publicationLinkElements = new Map();
+
+  links.forEach((link) => {
+    const source = getPublicationNode(link.from);
+    const target = getPublicationNode(link.to);
+    if (!source || !target) return;
+
+    const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+    line.setAttribute("stroke-width", String(publicationConfig.lineWidth));
+    line.setAttribute("class", getPublicationLinkClass(source, target));
+    updatePublicationLinkPosition(line, source, target, width, height);
+
+    publicationLinkElements.set(getPublicationLinkKey(link), line);
+    el.publicationLinks.appendChild(line);
+  });
+}
+
+function updatePublicationLinkPosition(line, source, target, width, height) {
   const sourcePosition = getPublicationDisplayPosition(source);
   const targetPosition = getPublicationDisplayPosition(target);
-
-  const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
   line.setAttribute("x1", String((sourcePosition.x / 100) * width));
   line.setAttribute("y1", String((sourcePosition.y / 100) * height));
   line.setAttribute("x2", String((targetPosition.x / 100) * width));
   line.setAttribute("y2", String((targetPosition.y / 100) * height));
-  line.setAttribute("stroke-width", String(publicationConfig.lineWidth));
-  line.setAttribute("class", getPublicationLinkClass(source, target));
-  el.publicationLinks.appendChild(line);
 }
 
 function createPublicationNodeElement(node) {
@@ -3165,31 +3185,7 @@ function stepPublicationPhysics(delta, now) {
     physicsNode.vy += Math.cos(now * 0.00048 + seed * 1.4) * driftStrength * delta;
   });
 
-  for (let index = 0; index < publicationNetwork.nodes.length; index += 1) {
-    for (let otherIndex = index + 1; otherIndex < publicationNetwork.nodes.length; otherIndex += 1) {
-      const current = publicationNetwork.nodes[index];
-      const other = publicationNetwork.nodes[otherIndex];
-      const currentPhysics = publicationPhysicsNodes.get(current.id);
-      const otherPhysics = publicationPhysicsNodes.get(other.id);
-      if (!currentPhysics || !otherPhysics) continue;
-
-      const dx = currentPhysics.x - otherPhysics.x || 0.01;
-      const dy = currentPhysics.y - otherPhysics.y || 0.01;
-      const distance = Math.max(Math.hypot(dx, dy), 5);
-      const repulsion = repulsionStrength / (distance * distance);
-      const forceX = (dx / distance) * repulsion * delta;
-      const forceY = (dy / distance) * repulsion * delta;
-
-      if (current.id !== publicationDraggedNodeId) {
-        currentPhysics.vx += forceX;
-        currentPhysics.vy += forceY;
-      }
-      if (other.id !== publicationDraggedNodeId) {
-        otherPhysics.vx -= forceX;
-        otherPhysics.vy -= forceY;
-      }
-    }
-  }
+  applyPublicationRepulsionForces(repulsionStrength, delta);
 
   publicationNetwork.links.forEach((link) => {
     const sourcePhysics = publicationPhysicsNodes.get(link.from);
@@ -3233,6 +3229,91 @@ function stepPublicationPhysics(delta, now) {
   });
 }
 
+// A repulsão entre pares de nós é a parte que mais custa da simulação: comparar
+// todos contra todos (O(n²)) é inviável acima de algumas centenas de documentos
+// (com 3000 nós isso seria 9 milhões de comparações a cada frame, 60x por
+// segundo). Em vez disso, os nós são agrupados em uma grade espacial e cada um
+// só é comparado com vizinhos próximos (O(n) na prática), já que a força cai
+// com o quadrado da distância e é desprezível além de poucas células.
+// A área útil do canvas (em % de posição) é de ~90x84; o tamanho de célula se
+// adapta à quantidade de nós para manter uma densidade média por célula, o
+// que mantém o custo por frame baixo tanto com 105 quanto com 3000+ nós.
+const PUBLICATION_REPULSION_AREA = 90 * 84;
+const PUBLICATION_REPULSION_TARGET_PER_CELL = 8;
+const PUBLICATION_REPULSION_MIN_CELL_SIZE = 6;
+const PUBLICATION_REPULSION_MAX_CELL_SIZE = 24;
+const PUBLICATION_REPULSION_GRID_OFFSET = 1000;
+const PUBLICATION_REPULSION_NEIGHBOR_OFFSETS = [
+  [0, 0],
+  [1, 0],
+  [0, 1],
+  [1, 1],
+  [-1, 1]
+];
+
+function getPublicationRepulsionCellSize(nodeCount) {
+  if (nodeCount <= 0) return PUBLICATION_REPULSION_MAX_CELL_SIZE;
+  const idealSize = Math.sqrt((PUBLICATION_REPULSION_AREA * PUBLICATION_REPULSION_TARGET_PER_CELL) / nodeCount);
+  return clampNumber(idealSize, PUBLICATION_REPULSION_MIN_CELL_SIZE, PUBLICATION_REPULSION_MAX_CELL_SIZE);
+}
+
+function buildPublicationRepulsionGrid(cellSize) {
+  const grid = new Map();
+  publicationNetwork.nodes.forEach((node) => {
+    const physicsNode = publicationPhysicsNodes.get(node.id);
+    if (!physicsNode) return;
+    const cellX = Math.floor(physicsNode.x / cellSize) + PUBLICATION_REPULSION_GRID_OFFSET;
+    const cellY = Math.floor(physicsNode.y / cellSize) + PUBLICATION_REPULSION_GRID_OFFSET;
+    const key = cellX * 1000000 + cellY;
+    if (!grid.has(key)) grid.set(key, { cellX, cellY, nodes: [] });
+    grid.get(key).nodes.push(node);
+  });
+  return grid;
+}
+
+function applyPublicationRepulsionForce(current, other, repulsionStrength, delta) {
+  const currentPhysics = publicationPhysicsNodes.get(current.id);
+  const otherPhysics = publicationPhysicsNodes.get(other.id);
+  if (!currentPhysics || !otherPhysics) return;
+
+  const dx = currentPhysics.x - otherPhysics.x || 0.01;
+  const dy = currentPhysics.y - otherPhysics.y || 0.01;
+  const distance = Math.max(Math.hypot(dx, dy), 5);
+  const repulsion = repulsionStrength / (distance * distance);
+  const forceX = (dx / distance) * repulsion * delta;
+  const forceY = (dy / distance) * repulsion * delta;
+
+  if (current.id !== publicationDraggedNodeId) {
+    currentPhysics.vx += forceX;
+    currentPhysics.vy += forceY;
+  }
+  if (other.id !== publicationDraggedNodeId) {
+    otherPhysics.vx -= forceX;
+    otherPhysics.vy -= forceY;
+  }
+}
+
+function applyPublicationRepulsionForces(repulsionStrength, delta) {
+  const cellSize = getPublicationRepulsionCellSize(publicationNetwork.nodes.length);
+  const grid = buildPublicationRepulsionGrid(cellSize);
+
+  grid.forEach((cell) => {
+    PUBLICATION_REPULSION_NEIGHBOR_OFFSETS.forEach(([offsetX, offsetY]) => {
+      const neighborKey = (cell.cellX + offsetX) * 1000000 + (cell.cellY + offsetY);
+      const neighbor = grid.get(neighborKey);
+      if (!neighbor) return;
+      const sameCell = offsetX === 0 && offsetY === 0;
+
+      for (let index = 0; index < cell.nodes.length; index += 1) {
+        const startIndex = sameCell ? index + 1 : 0;
+        for (let otherIndex = startIndex; otherIndex < neighbor.nodes.length; otherIndex += 1) {
+          applyPublicationRepulsionForce(cell.nodes[index], neighbor.nodes[otherIndex], repulsionStrength, delta);
+        }
+      }
+    });
+  });
+}
+
 function getPublicationDisplayPosition(node) {
   const physicsNode = publicationPhysicsNodes.get(node.id);
   if (!physicsNode) return { x: node.x, y: node.y };
@@ -3248,17 +3329,24 @@ function getPublicationNodeSeed(id) {
     .reduce((sum, char, index) => sum + char.charCodeAt(0) * (index + 1), 0) % 97;
 }
 
+// Chamada a cada frame de animação e a cada arraste: só reposiciona as linhas
+// já existentes (criadas por rebuildPublicationLinkElements), sem tocar no DOM
+// além de atualizar atributos. Com redes de milhares de documentos, recriar
+// todas as linhas 60x por segundo travaria a página.
 function renderPublicationLinksOnly() {
   if (!el.publicationCanvas || !el.publicationLinks) return;
-  const visibleIds = new Set(getVisiblePublicationNodes().map((node) => node.id));
   const rect = el.publicationCanvas.getBoundingClientRect();
   const width = Math.max(1, rect.width);
   const height = Math.max(1, rect.height);
-  el.publicationLinks.textContent = "";
   el.publicationLinks.setAttribute("viewBox", `0 0 ${width} ${height}`);
-  publicationNetwork.links
-    .filter((link) => visibleIds.has(link.from) && visibleIds.has(link.to))
-    .forEach((link) => drawPublicationLink(link, width, height));
+
+  publicationLinkElements.forEach((line, key) => {
+    const [from, to] = key.split("::");
+    const source = getPublicationNode(from);
+    const target = getPublicationNode(to);
+    if (!source || !target) return;
+    updatePublicationLinkPosition(line, source, target, width, height);
+  });
 }
 
 function applyPublicationNodeDomPositions() {
