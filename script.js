@@ -471,6 +471,11 @@ const DEFAULT_PUBLICATION_CONFIG = {
   nodeSize: 62,
   lineWidth: 3,
   showLabels: true,
+  // Com redes grandes (centenas/milhares de documentos), desenhar todas as
+  // conexões de uma vez vira uma "bola de fios" ilegível. Por padrão só as
+  // conexões do item selecionado aparecem; o usuário pode desligar para ver
+  // a rede completa (o que ainda faz sentido em redes pequenas).
+  focusLinksOnSelection: true,
   filters: { FQ: true, IT: true, PRQ: true },
   search: ""
 };
@@ -652,6 +657,7 @@ const el = {
   publicationNodeSize: document.getElementById("publicationNodeSize"),
   publicationLineWidth: document.getElementById("publicationLineWidth"),
   publicationLabelsToggle: document.getElementById("publicationLabelsToggle"),
+  publicationFocusLinksToggle: document.getElementById("publicationFocusLinksToggle"),
   publicationAnimateBtn: document.getElementById("publicationAnimateBtn"),
   workspace: document.querySelector(".workspace")
 };
@@ -1049,7 +1055,7 @@ el.publicationSearch?.addEventListener("input", handlePublicationConfigChange);
 [el.publicationFilterFq, el.publicationFilterIt, el.publicationFilterPrq]
   .filter(Boolean)
   .forEach((input) => input.addEventListener("change", handlePublicationConfigChange));
-[el.publicationIntensity, el.publicationNodeSize, el.publicationLineWidth, el.publicationLabelsToggle]
+[el.publicationIntensity, el.publicationNodeSize, el.publicationLineWidth, el.publicationLabelsToggle, el.publicationFocusLinksToggle]
   .filter(Boolean)
   .forEach((input) => input.addEventListener("input", handlePublicationConfigChange));
 el.filterChips.forEach((chip) => {
@@ -2818,6 +2824,7 @@ function syncPublicationControls() {
   if (el.publicationNodeSize) el.publicationNodeSize.value = String(publicationConfig.nodeSize);
   if (el.publicationLineWidth) el.publicationLineWidth.value = String(publicationConfig.lineWidth);
   if (el.publicationLabelsToggle) el.publicationLabelsToggle.checked = Boolean(publicationConfig.showLabels);
+  if (el.publicationFocusLinksToggle) el.publicationFocusLinksToggle.checked = Boolean(publicationConfig.focusLinksOnSelection);
 }
 
 function handlePublicationConfigChange() {
@@ -2826,6 +2833,7 @@ function handlePublicationConfigChange() {
     nodeSize: Number(el.publicationNodeSize?.value || DEFAULT_PUBLICATION_CONFIG.nodeSize),
     lineWidth: Number(el.publicationLineWidth?.value || DEFAULT_PUBLICATION_CONFIG.lineWidth),
     showLabels: Boolean(el.publicationLabelsToggle?.checked),
+    focusLinksOnSelection: Boolean(el.publicationFocusLinksToggle?.checked),
     search: cleanTextLine(el.publicationSearch?.value || ""),
     filters: {
       FQ: Boolean(el.publicationFilterFq?.checked),
@@ -2843,7 +2851,7 @@ function renderPublicationNetwork() {
   syncPublicationPhysicsState();
   const visibleNodes = getVisiblePublicationNodes();
   const visibleIds = new Set(visibleNodes.map((node) => node.id));
-  const links = publicationNetwork.links.filter((link) => visibleIds.has(link.from) && visibleIds.has(link.to));
+  const links = getPublicationLinksForDisplay(visibleIds);
   const rect = el.publicationCanvas.getBoundingClientRect();
   const width = Math.max(1, rect.width);
   const height = Math.max(1, rect.height);
@@ -2861,6 +2869,30 @@ function renderPublicationNetwork() {
 
   renderPublicationSelectors();
   renderPublicationInfoPanel();
+}
+
+// Em redes grandes, mostrar todos os links de uma vez vira uma "bola de fios"
+// (ver relato de rede com 671 documentos). Por padrão só os links do item
+// selecionado aparecem; com o modo desligado, volta a mostrar tudo.
+function getPublicationLinksForDisplay(visibleIds) {
+  const baseLinks = publicationNetwork.links.filter((link) => visibleIds.has(link.from) && visibleIds.has(link.to));
+  if (!publicationConfig.focusLinksOnSelection) return baseLinks;
+  if (!selectedPublicationId) return [];
+  return baseLinks.filter((link) => link.from === selectedPublicationId || link.to === selectedPublicationId);
+}
+
+// Reconstrói só as linhas (sem recriar os nós) refletindo a seleção atual.
+// Usado no clique/início de arraste, que precisa atualizar o conjunto de
+// links exibidos imediatamente quando o modo de foco está ativo.
+function refreshPublicationLinksForSelection() {
+  if (!el.publicationCanvas || !el.publicationLinks) return;
+  const visibleIds = new Set(getVisiblePublicationNodes().map((node) => node.id));
+  const links = getPublicationLinksForDisplay(visibleIds);
+  const rect = el.publicationCanvas.getBoundingClientRect();
+  const width = Math.max(1, rect.width);
+  const height = Math.max(1, rect.height);
+  el.publicationLinks.setAttribute("viewBox", `0 0 ${width} ${height}`);
+  rebuildPublicationLinkElements(links, width, height);
 }
 
 function getPublicationLinkKey(link) {
@@ -2954,7 +2986,7 @@ function attachPublicationNodeDrag(button, nodeId) {
     Array.from(el.publicationNodes?.children || []).forEach((item) => {
       item.classList.toggle("selected", item.dataset.publicationId === nodeId);
     });
-    renderPublicationLinksOnly();
+    refreshPublicationLinksForSelection();
     renderPublicationInfoPanel();
   });
   button.addEventListener("pointermove", move);
@@ -3557,6 +3589,7 @@ function normalizePublicationConfig(value) {
     nodeSize: clampNumber(Number(source.nodeSize), 44, 86),
     lineWidth: clampNumber(Number(source.lineWidth), 1, 8),
     showLabels: source.showLabels !== false,
+    focusLinksOnSelection: source.focusLinksOnSelection !== false,
     search: cleanTextLine(source.search || ""),
     filters: {
       FQ: source.filters?.FQ !== false,
