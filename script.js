@@ -3023,11 +3023,38 @@ function renderPublicationNetwork() {
 // Em redes grandes, mostrar todos os links de uma vez vira uma "bola de fios"
 // (ver relato de rede com 671 documentos). Por padrão só os links do item
 // selecionado aparecem; com o modo desligado, volta a mostrar tudo.
+// Limite de segurança: uma rede importada antes do limite por documento
+// existir (ou qualquer outro jeito de acabar com um grafo quase completo)
+// pode ter dezenas ou centenas de milhares de links salvos. Tentar desenhar
+// tudo isso de uma vez trava a aba antes de pintar qualquer coisa na tela.
+// Esse teto garante que a tela sempre renderiza, não importa o que esteja
+// salvo.
+const PUBLICATION_MAX_RENDERED_LINKS = 4000;
+
+// A física da mola entre nós ligados também precisa desse teto: sem ele, uma
+// rede com links legados em excesso recalcularia centenas de milhares de
+// molas a cada frame de animação (60x por segundo), travando a aba mesmo que
+// a renderização em si já esteja limitada.
+function getPublicationLinksForPhysics() {
+  return publicationNetwork.links.length > PUBLICATION_MAX_RENDERED_LINKS
+    ? publicationNetwork.links.slice(0, PUBLICATION_MAX_RENDERED_LINKS)
+    : publicationNetwork.links;
+}
+
 function getPublicationLinksForDisplay(visibleIds) {
   const baseLinks = publicationNetwork.links.filter((link) => visibleIds.has(link.from) && visibleIds.has(link.to));
-  if (!publicationConfig.focusLinksOnSelection) return baseLinks;
-  if (!selectedPublicationId) return [];
-  return baseLinks.filter((link) => link.from === selectedPublicationId || link.to === selectedPublicationId);
+
+  // Filtra pela seleção (quando o modo de foco está ligado) antes de aplicar
+  // o teto de segurança, para não cortar justo os links do nó selecionado.
+  const scoped = publicationConfig.focusLinksOnSelection
+    ? (selectedPublicationId
+      ? baseLinks.filter((link) => link.from === selectedPublicationId || link.to === selectedPublicationId)
+      : [])
+    : baseLinks;
+
+  return scoped.length > PUBLICATION_MAX_RENDERED_LINKS
+    ? scoped.slice(0, PUBLICATION_MAX_RENDERED_LINKS)
+    : scoped;
 }
 
 // Reconstrói só as linhas (sem recriar os nós) refletindo a seleção atual.
@@ -3379,7 +3406,7 @@ function stepPublicationPhysics(delta, now) {
 
   applyPublicationRepulsionForces(repulsionStrength, delta);
 
-  publicationNetwork.links.forEach((link) => {
+  getPublicationLinksForPhysics().forEach((link) => {
     const sourcePhysics = publicationPhysicsNodes.get(link.from);
     const targetPhysics = publicationPhysicsNodes.get(link.to);
     if (!sourcePhysics || !targetPhysics) return;
@@ -3682,7 +3709,15 @@ function loadStoredPublicationNetwork() {
 }
 
 function savePublicationNetwork() {
-  localStorage.setItem(PUBLICATION_NETWORK_KEY, JSON.stringify(publicationNetwork));
+  try {
+    localStorage.setItem(PUBLICATION_NETWORK_KEY, JSON.stringify(publicationNetwork));
+  } catch (error) {
+    // Uma rede com uma quantidade de links muito acima do normal (dado
+    // legado) pode estourar a cota do localStorage. Sem o try/catch, isso
+    // interrompia a função no meio de uma ação (arrastar, importar, etc.) e
+    // pulava os passos seguintes, como o re-render.
+    console.warn("Não foi possível salvar a rede de publicações localmente.", error);
+  }
 }
 
 function loadStoredPublicationConfig() {
