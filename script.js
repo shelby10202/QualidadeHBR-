@@ -490,6 +490,13 @@ const PUBLICATION_FIELD_MAX = 97;
 // permitir um pequeno "respiro" visual nas bordas.
 const PUBLICATION_DISPLAY_MIN = 2;
 const PUBLICATION_DISPLAY_MAX = 98;
+// Limite de segurança para quantos links são desenhados/calculados por vez.
+// Uma rede importada antes de existir limite por documento (ou qualquer outro
+// jeito de acabar com um grafo quase completo) pode ter dezenas ou centenas
+// de milhares de links salvos; tentar desenhar tudo isso de uma vez trava a
+// aba. Precisa ficar aqui em cima: initPublicationNetwork() roda assim que a
+// página carrega e já usa esse valor antes de chegar no resto do arquivo.
+const PUBLICATION_MAX_RENDERED_LINKS = 4000;
 
 prepareStaticShells();
 
@@ -3023,13 +3030,11 @@ function renderPublicationNetwork() {
 // Em redes grandes, mostrar todos os links de uma vez vira uma "bola de fios"
 // (ver relato de rede com 671 documentos). Por padrão só os links do item
 // selecionado aparecem; com o modo desligado, volta a mostrar tudo.
-// Limite de segurança: uma rede importada antes do limite por documento
-// existir (ou qualquer outro jeito de acabar com um grafo quase completo)
-// pode ter dezenas ou centenas de milhares de links salvos. Tentar desenhar
-// tudo isso de uma vez trava a aba antes de pintar qualquer coisa na tela.
-// Esse teto garante que a tela sempre renderiza, não importa o que esteja
-// salvo.
-const PUBLICATION_MAX_RENDERED_LINKS = 4000;
+// (PUBLICATION_MAX_RENDERED_LINKS fica declarada perto do topo do arquivo,
+// não aqui: initPublicationNetwork() roda assim que a página carrega e já
+// chama getPublicationLinksForDisplay logo abaixo — uma const só existe a
+// partir da linha onde é declarada, então declará-la aqui embaixo quebrava
+// a página inteira com "Cannot access ... before initialization".)
 
 // A física da mola entre nós ligados também precisa desse teto: sem ele, uma
 // rede com links legados em excesso recalcularia centenas de milhares de
