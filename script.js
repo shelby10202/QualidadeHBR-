@@ -472,11 +472,10 @@ const DEFAULT_PUBLICATION_CONFIG = {
   nodeSize: 32,
   lineWidth: 3,
   showLabels: true,
-  // Com redes grandes (centenas/milhares de documentos), desenhar todas as
-  // conexões de uma vez vira uma "bola de fios" ilegível. Por padrão só as
-  // conexões do item selecionado aparecem; o usuário pode desligar para ver
-  // a rede completa (o que ainda faz sentido em redes pequenas).
-  focusLinksOnSelection: true,
+  // Todas as conexões aparecem por padrão. Em redes muito grandes isso pode
+  // ficar denso; o zoom/pan do quadro ajuda a navegar nesse caso, e quem
+  // preferir pode ligar "Só conexões selecionadas" no painel Tela.
+  focusLinksOnSelection: false,
   filters: { FQ: true, IT: true, PRQ: true },
   search: ""
 };
@@ -646,11 +645,16 @@ const el = {
   publicationNetworkTitle: document.getElementById("publicationNetworkTitle"),
   publicationShell: document.getElementById("publicationShell"),
   publicationCanvas: document.getElementById("publicationCanvas"),
+  publicationZoomLayer: document.getElementById("publicationZoomLayer"),
   publicationLinks: document.getElementById("publicationLinks"),
   publicationNodes: document.getElementById("publicationNodes"),
   publicationMenuBtn: document.getElementById("publicationMenuBtn"),
   publicationInfoPanel: document.getElementById("publicationInfoPanel"),
   publicationResetViewBtn: document.getElementById("publicationResetViewBtn"),
+  publicationZoomInBtn: document.getElementById("publicationZoomInBtn"),
+  publicationZoomOutBtn: document.getElementById("publicationZoomOutBtn"),
+  publicationZoomResetBtn: document.getElementById("publicationZoomResetBtn"),
+  publicationZoomLevel: document.getElementById("publicationZoomLevel"),
   publicationSearch: document.getElementById("publicationSearch"),
   publicationFilterFq: document.getElementById("publicationFilterFq"),
   publicationFilterIt: document.getElementById("publicationFilterIt"),
@@ -697,6 +701,14 @@ let publicationPhysicsNodes = new Map();
 // Elementos <line> já anexados ao SVG, indexados por link, reaproveitados a cada
 // frame de animação (evita recriar centenas/milhares de elementos 60x por segundo).
 let publicationLinkElements = new Map();
+// Zoom/pan do quadro da rede: puramente visual (transform em cima do
+// #publicationZoomLayer), não muda as coordenadas lógicas dos nós.
+const PUBLICATION_ZOOM_MIN = 0.4;
+const PUBLICATION_ZOOM_MAX = 4;
+let publicationZoomScale = 1;
+let publicationZoomX = 0;
+let publicationZoomY = 0;
+let publicationPanState = null;
 let documentImportState = createEmptyDocumentImportState();
 let adMonitorState = loadStoredAdMonitorState();
 let adReports = loadStoredAdReports();
@@ -1063,6 +1075,20 @@ el.publicationDeleteSelectedBtn?.addEventListener("click", deleteSelectedPublica
 el.publicationResetViewBtn?.addEventListener("click", resetPublicationLayout);
 el.publicationMenuBtn?.addEventListener("click", togglePublicationMenu);
 el.publicationAnimateBtn?.addEventListener("click", animatePublicationNetwork);
+el.publicationZoomInBtn?.addEventListener("click", () => {
+  const center = getPublicationCanvasCenter();
+  setPublicationZoom(publicationZoomScale * 1.3, center.x, center.y, true);
+});
+el.publicationZoomOutBtn?.addEventListener("click", () => {
+  const center = getPublicationCanvasCenter();
+  setPublicationZoom(publicationZoomScale / 1.3, center.x, center.y, true);
+});
+el.publicationZoomResetBtn?.addEventListener("click", resetPublicationZoom);
+el.publicationCanvas?.addEventListener("wheel", handlePublicationWheelZoom, { passive: false });
+el.publicationCanvas?.addEventListener("pointerdown", handlePublicationPanStart);
+el.publicationCanvas?.addEventListener("pointermove", handlePublicationPanMove);
+el.publicationCanvas?.addEventListener("pointerup", handlePublicationPanEnd);
+el.publicationCanvas?.addEventListener("pointercancel", handlePublicationPanEnd);
 el.publicationSearch?.addEventListener("input", handlePublicationConfigChange);
 [el.publicationFilterFq, el.publicationFilterIt, el.publicationFilterPrq]
   .filter(Boolean)
@@ -2842,6 +2868,7 @@ function clampInteger(value, min, max) {
 
 function initPublicationNetwork() {
   syncPublicationPhysicsState();
+  applyPublicationZoomTransform();
   // A rede fica em localStorage para permitir ajustes rápidos sem alterar o código.
   syncPublicationControls();
   renderPublicationNetwork();
@@ -2853,6 +2880,89 @@ function togglePublicationMenu() {
   const isOpen = !el.publicationShell?.classList.contains("menu-open");
   el.publicationShell?.classList.toggle("menu-open", isOpen);
   el.publicationMenuBtn?.setAttribute("aria-expanded", String(isOpen));
+}
+
+// Zoom/pan do quadro da rede. É só uma transformação visual (CSS transform)
+// em cima do #publicationZoomLayer: os nós continuam posicionados por
+// porcentagem do tamanho original do canvas, então nada na física ou no
+// cálculo de posição precisa saber que existe zoom.
+function applyPublicationZoomTransform() {
+  if (!el.publicationZoomLayer) return;
+  el.publicationZoomLayer.style.transform =
+    `translate(${publicationZoomX}px, ${publicationZoomY}px) scale(${publicationZoomScale})`;
+  if (el.publicationZoomLevel) {
+    el.publicationZoomLevel.textContent = `${Math.round(publicationZoomScale * 100)}%`;
+  }
+}
+
+// Ajusta o zoom mantendo o ponto (anchorX, anchorY, em pixels relativos ao
+// canvas) fixo na tela, para o zoom "puxar" na direção do cursor/centro em
+// vez de sempre re-centralizar no canto superior esquerdo.
+function setPublicationZoom(nextScale, anchorX, anchorY, animated) {
+  const clamped = clampNumber(nextScale, PUBLICATION_ZOOM_MIN, PUBLICATION_ZOOM_MAX);
+  if (clamped === publicationZoomScale) return;
+
+  const contentX = (anchorX - publicationZoomX) / publicationZoomScale;
+  const contentY = (anchorY - publicationZoomY) / publicationZoomScale;
+  publicationZoomX = anchorX - contentX * clamped;
+  publicationZoomY = anchorY - contentY * clamped;
+  publicationZoomScale = clamped;
+
+  el.publicationZoomLayer?.classList.toggle("is-animated-zoom", Boolean(animated));
+  applyPublicationZoomTransform();
+}
+
+function getPublicationCanvasCenter() {
+  const rect = el.publicationCanvas?.getBoundingClientRect();
+  if (!rect) return { x: 0, y: 0 };
+  return { x: rect.width / 2, y: rect.height / 2 };
+}
+
+function resetPublicationZoom() {
+  publicationZoomScale = 1;
+  publicationZoomX = 0;
+  publicationZoomY = 0;
+  el.publicationZoomLayer?.classList.add("is-animated-zoom");
+  applyPublicationZoomTransform();
+}
+
+function handlePublicationWheelZoom(event) {
+  if (!el.publicationCanvas) return;
+  event.preventDefault();
+  const rect = el.publicationCanvas.getBoundingClientRect();
+  const anchorX = event.clientX - rect.left;
+  const anchorY = event.clientY - rect.top;
+  const zoomFactor = Math.exp(-event.deltaY * 0.0015);
+  setPublicationZoom(publicationZoomScale * zoomFactor, anchorX, anchorY, false);
+}
+
+function handlePublicationPanStart(event) {
+  if (!el.publicationCanvas) return;
+  // Não inicia o pan se o gesto começou em cima de um nó (que tem seu
+  // próprio arraste) ou de um controle da barra superior.
+  if (event.target.closest(".publication-node")) return;
+  publicationPanState = {
+    pointerId: event.pointerId,
+    startClientX: event.clientX,
+    startClientY: event.clientY,
+    startX: publicationZoomX,
+    startY: publicationZoomY
+  };
+  el.publicationCanvas.classList.add("is-panning");
+  el.publicationCanvas.setPointerCapture?.(event.pointerId);
+}
+
+function handlePublicationPanMove(event) {
+  if (!publicationPanState || event.pointerId !== publicationPanState.pointerId) return;
+  publicationZoomX = publicationPanState.startX + (event.clientX - publicationPanState.startClientX);
+  publicationZoomY = publicationPanState.startY + (event.clientY - publicationPanState.startClientY);
+  applyPublicationZoomTransform();
+}
+
+function handlePublicationPanEnd(event) {
+  if (!publicationPanState || event.pointerId !== publicationPanState.pointerId) return;
+  publicationPanState = null;
+  el.publicationCanvas?.classList.remove("is-panning");
 }
 
 function syncPublicationControls() {
@@ -3002,10 +3112,16 @@ function attachPublicationNodeDrag(button, nodeId) {
   const move = (event) => {
     if (!dragging || !el.publicationCanvas) return;
     const rect = el.publicationCanvas.getBoundingClientRect();
+    // O layer de zoom só transforma visualmente; para saber onde o ponteiro
+    // está no espaço lógico (0-100%) é preciso desfazer o zoom/pan atual.
+    const localX = event.clientX - rect.left;
+    const localY = event.clientY - rect.top;
+    const contentX = (localX - publicationZoomX) / publicationZoomScale;
+    const contentY = (localY - publicationZoomY) / publicationZoomScale;
     updatePublicationNodePosition(
       nodeId,
-      ((event.clientX - rect.left) / rect.width) * 100,
-      ((event.clientY - rect.top) / rect.height) * 100
+      (contentX / rect.width) * 100,
+      (contentY / rect.height) * 100
     );
   };
 
@@ -3655,7 +3771,7 @@ function normalizePublicationConfig(value) {
     nodeSize: clampNumber(Number(source.nodeSize), 18, 70),
     lineWidth: clampNumber(Number(source.lineWidth), 1, 8),
     showLabels: source.showLabels !== false,
-    focusLinksOnSelection: source.focusLinksOnSelection !== false,
+    focusLinksOnSelection: source.focusLinksOnSelection === true,
     search: cleanTextLine(source.search || ""),
     filters: {
       FQ: source.filters?.FQ !== false,

@@ -2970,6 +2970,32 @@ button {
   gap: 8px;
 }
 
+.publication-zoom-controls {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  border: 1px solid #303030;
+  border-radius: 8px;
+  overflow: hidden;
+  margin-right: 4px;
+}
+
+.publication-zoom-controls .publication-ghost-btn {
+  border: 0;
+  border-radius: 0;
+  min-width: 36px;
+}
+
+.publication-zoom-controls .publication-ghost-btn + .publication-ghost-btn {
+  border-left: 1px solid #303030;
+}
+
+#publicationZoomLevel {
+  font-variant-numeric: tabular-nums;
+  min-width: 40px;
+  display: inline-block;
+}
+
 .publication-network-head span,
 .publication-control-panel summary,
 .publication-search span,
@@ -3026,9 +3052,26 @@ button {
   position: relative;
   min-height: 0;
   overflow: hidden;
+  touch-action: none;
+  cursor: grab;
   background:
     radial-gradient(circle at 50% 48%, rgba(255, 255, 255, 0.045), transparent 46%),
     #202020;
+}
+
+.publication-zoom-layer {
+  position: absolute;
+  inset: 0;
+  transform-origin: 0 0;
+  will-change: transform;
+}
+
+.publication-zoom-layer.is-animated-zoom {
+  transition: transform 180ms ease;
+}
+
+.publication-canvas.is-panning {
+  cursor: grabbing;
 }
 
 .publication-links,

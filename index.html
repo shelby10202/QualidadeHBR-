@@ -378,6 +378,11 @@
                 <strong id="publicationNetworkTitle">Impacto documental</strong>
               </div>
               <div class="publication-head-actions">
+                <div class="publication-zoom-controls">
+                  <button type="button" id="publicationZoomOutBtn" class="publication-ghost-btn" aria-label="Diminuir zoom">−</button>
+                  <button type="button" id="publicationZoomResetBtn" class="publication-ghost-btn" aria-label="Redefinir zoom"><span id="publicationZoomLevel">100%</span></button>
+                  <button type="button" id="publicationZoomInBtn" class="publication-ghost-btn" aria-label="Aumentar zoom">+</button>
+                </div>
                 <button type="button" id="publicationResetViewBtn" class="publication-ghost-btn">Reorganizar</button>
                 <button type="button" id="publicationMenuBtn" class="publication-menu-btn" aria-label="Abrir menu de Publicações" aria-expanded="false">
                   <span></span>
@@ -388,8 +393,10 @@
             </div>
 
             <div id="publicationCanvas" class="publication-canvas" aria-label="Rede de documentos técnicos">
-              <svg id="publicationLinks" class="publication-links" aria-hidden="true"></svg>
-              <div id="publicationNodes" class="publication-nodes"></div>
+              <div id="publicationZoomLayer" class="publication-zoom-layer">
+                <svg id="publicationLinks" class="publication-links" aria-hidden="true"></svg>
+                <div id="publicationNodes" class="publication-nodes"></div>
+              </div>
             </div>
           </section>
 
@@ -459,7 +466,7 @@
               </label>
               <label class="publication-switch">
                 <span>Só conexões selecionadas</span>
-                <input id="publicationFocusLinksToggle" type="checkbox" checked>
+                <input id="publicationFocusLinksToggle" type="checkbox">
               </label>
               <button type="button" id="publicationAnimateBtn" class="modal-action">Animar</button>
             </details>
