@@ -469,7 +469,7 @@ const DEFAULT_PUBLICATION_NETWORK = {
 
 const DEFAULT_PUBLICATION_CONFIG = {
   intensity: 82,
-  nodeSize: 62,
+  nodeSize: 32,
   lineWidth: 3,
   showLabels: true,
   // Com redes grandes (centenas/milhares de documentos), desenhar todas as
@@ -480,6 +480,17 @@ const DEFAULT_PUBLICATION_CONFIG = {
   filters: { FQ: true, IT: true, PRQ: true },
   search: ""
 };
+
+// Área útil (em % de posição, dentro do canvas) onde os nós podem se mover.
+// Antes o retângulo era 90x84 e assimétrico (x:5-95, y:8-92), o que empurrava
+// os nós para faixas finas perto das bordas de cima/baixo com muitos
+// documentos. Um quadro maior e simétrico dá mais espaço para espalhar.
+const PUBLICATION_FIELD_MIN = 3;
+const PUBLICATION_FIELD_MAX = 97;
+// O retângulo de exibição é levemente maior que o de física/arraste, para
+// permitir um pequeno "respiro" visual nas bordas.
+const PUBLICATION_DISPLAY_MIN = 2;
+const PUBLICATION_DISPLAY_MAX = 98;
 
 prepareStaticShells();
 
@@ -1452,7 +1463,7 @@ function createPublicationNodesFromDocumentRows(documents) {
     const title = cleanTextLine(record.nomeDocumento || code);
     const type = inferPublicationType(record.documento, code);
     const angle = (index / total) * Math.PI * 2;
-    const radius = documents.length > 8 ? 35 : 29;
+    const radius = documents.length > 8 ? 38 : 32;
     const id = uniqueDocumentImportId(slugifyAreaName(`${type}-${code}`), usedIds);
 
     return {
@@ -1469,8 +1480,8 @@ function createPublicationNodesFromDocumentRows(documents) {
       sourceFile: documentImportState.fileName,
       sourceSheet: documentImportState.sheetName,
       sourceRow: record.rowNumber,
-      x: clampNumber(50 + Math.cos(angle) * radius, 8, 92),
-      y: clampNumber(52 + Math.sin(angle) * radius, 10, 90)
+      x: clampNumber(50 + Math.cos(angle) * radius, PUBLICATION_FIELD_MIN, PUBLICATION_FIELD_MAX),
+      y: clampNumber(52 + Math.sin(angle) * radius, PUBLICATION_FIELD_MIN, PUBLICATION_FIELD_MAX)
     };
   });
 }
@@ -3023,8 +3034,8 @@ function attachPublicationNodeDrag(button, nodeId) {
 }
 
 function updatePublicationNodePosition(nodeId, x, y) {
-  const nextX = clampNumber(x, 5, 95);
-  const nextY = clampNumber(y, 8, 92);
+  const nextX = clampNumber(x, PUBLICATION_FIELD_MIN, PUBLICATION_FIELD_MAX);
+  const nextY = clampNumber(y, PUBLICATION_FIELD_MIN, PUBLICATION_FIELD_MAX);
   const physicsNode = publicationPhysicsNodes.get(nodeId);
   if (physicsNode) {
     physicsNode.x = nextX;
@@ -3074,8 +3085,8 @@ function handlePublicationNodeSubmit(event) {
     code,
     title,
     sector: sector || "Publicações",
-    x: clampNumber(50 + Math.cos(angle) * 28, 8, 92),
-    y: clampNumber(52 + Math.sin(angle) * 28, 10, 90)
+    x: clampNumber(50 + Math.cos(angle) * 30, PUBLICATION_FIELD_MIN, PUBLICATION_FIELD_MAX),
+    y: clampNumber(52 + Math.sin(angle) * 30, PUBLICATION_FIELD_MIN, PUBLICATION_FIELD_MAX)
   };
 
   const nextNodes = [...publicationNetwork.nodes, node];
@@ -3133,8 +3144,8 @@ function resetPublicationLayout() {
       const angle = (index / total) * Math.PI * 2;
       return {
         ...node,
-        x: clampNumber(50 + Math.cos(angle) * 30, 8, 92),
-        y: clampNumber(52 + Math.sin(angle) * 30, 10, 90)
+        x: clampNumber(50 + Math.cos(angle) * 32, PUBLICATION_FIELD_MIN, PUBLICATION_FIELD_MAX),
+        y: clampNumber(52 + Math.sin(angle) * 32, PUBLICATION_FIELD_MIN, PUBLICATION_FIELD_MAX)
       };
     })
   };
@@ -3201,8 +3212,8 @@ function syncPublicationPhysicsState() {
   publicationNetwork.nodes.forEach((node) => {
     const previous = previousNodes.get(node.id);
     nextNodes.set(node.id, {
-      x: previous ? clampNumber(previous.x, 5, 95) : node.x,
-      y: previous ? clampNumber(previous.y, 8, 92) : node.y,
+      x: previous ? clampNumber(previous.x, PUBLICATION_FIELD_MIN, PUBLICATION_FIELD_MAX) : node.x,
+      y: previous ? clampNumber(previous.y, PUBLICATION_FIELD_MIN, PUBLICATION_FIELD_MAX) : node.y,
       vx: previous?.vx || 0,
       vy: previous?.vy || 0,
       targetX: node.x,
@@ -3216,14 +3227,19 @@ function syncPublicationPhysicsState() {
 function stepPublicationPhysics(delta, now) {
   if (!publicationNetwork.nodes.length) return;
 
+  // Forças bem mais suaves que a versão original: o objetivo é um movimento
+  // lento e contínuo (deriva), não um reposicionamento rápido a cada frame.
+  // A repulsão em especial foi reduzida bastante, já que com muitos
+  // documentos vários nós ficam perto do limite mínimo de distância o tempo
+  // todo, e uma repulsão forte nesse caso deixa a rede "nervosa".
   const intensity = clampNumber(publicationConfig.intensity, 10, 100) / 100;
-  const centerStrength = 0.0012 + intensity * 0.0016;
-  const targetStrength = 0.006 + intensity * 0.006;
-  const repulsionStrength = 7 + intensity * 9;
-  const linkStrength = 0.009 + intensity * 0.007;
+  const centerStrength = 0.0008 + intensity * 0.001;
+  const targetStrength = 0.003 + intensity * 0.003;
+  const repulsionStrength = 2 + intensity * 3;
+  const linkStrength = 0.006 + intensity * 0.004;
   const desiredLinkDistance = 22 + Math.min(publicationConfig.nodeSize, 90) * 0.08;
-  const damping = Math.pow(0.88 - intensity * 0.025, delta);
-  const driftStrength = 0.002 + intensity * 0.004;
+  const damping = Math.pow(0.95 - intensity * 0.015, delta);
+  const driftStrength = 0.0008 + intensity * 0.0012;
 
   publicationNetwork.nodes.forEach((node) => {
     const physicsNode = publicationPhysicsNodes.get(node.id);
@@ -3241,8 +3257,8 @@ function stepPublicationPhysics(delta, now) {
     const seed = getPublicationNodeSeed(node.id);
     physicsNode.vx += ((physicsNode.targetX - physicsNode.x) * targetStrength + (50 - physicsNode.x) * centerStrength) * delta;
     physicsNode.vy += ((physicsNode.targetY - physicsNode.y) * targetStrength + (50 - physicsNode.y) * centerStrength) * delta;
-    physicsNode.vx += Math.sin(now * 0.00055 + seed) * driftStrength * delta;
-    physicsNode.vy += Math.cos(now * 0.00048 + seed * 1.4) * driftStrength * delta;
+    physicsNode.vx += Math.sin(now * 0.00018 + seed) * driftStrength * delta;
+    physicsNode.vy += Math.cos(now * 0.00015 + seed * 1.4) * driftStrength * delta;
   });
 
   applyPublicationRepulsionForces(repulsionStrength, delta);
@@ -3278,13 +3294,13 @@ function stepPublicationPhysics(delta, now) {
     physicsNode.x += physicsNode.vx * delta;
     physicsNode.y += physicsNode.vy * delta;
 
-    if (physicsNode.x < 5 || physicsNode.x > 95) {
-      physicsNode.x = clampNumber(physicsNode.x, 5, 95);
-      physicsNode.vx *= -0.22;
+    if (physicsNode.x < PUBLICATION_FIELD_MIN || physicsNode.x > PUBLICATION_FIELD_MAX) {
+      physicsNode.x = clampNumber(physicsNode.x, PUBLICATION_FIELD_MIN, PUBLICATION_FIELD_MAX);
+      physicsNode.vx *= -0.12;
     }
-    if (physicsNode.y < 8 || physicsNode.y > 92) {
-      physicsNode.y = clampNumber(physicsNode.y, 8, 92);
-      physicsNode.vy *= -0.22;
+    if (physicsNode.y < PUBLICATION_FIELD_MIN || physicsNode.y > PUBLICATION_FIELD_MAX) {
+      physicsNode.y = clampNumber(physicsNode.y, PUBLICATION_FIELD_MIN, PUBLICATION_FIELD_MAX);
+      physicsNode.vy *= -0.12;
     }
   });
 }
@@ -3295,10 +3311,11 @@ function stepPublicationPhysics(delta, now) {
 // segundo). Em vez disso, os nós são agrupados em uma grade espacial e cada um
 // só é comparado com vizinhos próximos (O(n) na prática), já que a força cai
 // com o quadrado da distância e é desprezível além de poucas células.
-// A área útil do canvas (em % de posição) é de ~90x84; o tamanho de célula se
-// adapta à quantidade de nós para manter uma densidade média por célula, o
-// que mantém o custo por frame baixo tanto com 105 quanto com 3000+ nós.
-const PUBLICATION_REPULSION_AREA = 90 * 84;
+// A área útil do canvas (em % de posição) é (PUBLICATION_FIELD_MAX -
+// PUBLICATION_FIELD_MIN)²; o tamanho de célula se adapta à quantidade de nós
+// para manter uma densidade média por célula, o que mantém o custo por frame
+// baixo tanto com 105 quanto com 3000+ nós.
+const PUBLICATION_REPULSION_AREA = (PUBLICATION_FIELD_MAX - PUBLICATION_FIELD_MIN) ** 2;
 const PUBLICATION_REPULSION_TARGET_PER_CELL = 8;
 const PUBLICATION_REPULSION_MIN_CELL_SIZE = 6;
 const PUBLICATION_REPULSION_MAX_CELL_SIZE = 24;
@@ -3378,8 +3395,8 @@ function getPublicationDisplayPosition(node) {
   const physicsNode = publicationPhysicsNodes.get(node.id);
   if (!physicsNode) return { x: node.x, y: node.y };
   return {
-    x: clampNumber(physicsNode.x, 4, 96),
-    y: clampNumber(physicsNode.y, 7, 93)
+    x: clampNumber(physicsNode.x, PUBLICATION_DISPLAY_MIN, PUBLICATION_DISPLAY_MAX),
+    y: clampNumber(physicsNode.y, PUBLICATION_DISPLAY_MIN, PUBLICATION_DISPLAY_MAX)
   };
 }
 
@@ -3589,11 +3606,12 @@ function normalizePublicationNode(node) {
     adjacentSector: cleanTextLine(node.adjacentSector || node.setorAdjacente || ""),
     developedBy: cleanTextLine(node.developedBy || node.desenvolvidoPor || ""),
     revisions: cleanTextLine(node.revisions || node.revisoes || node.revisões || ""),
+    relatedCodes: cleanTextLine(node.relatedCodes || ""),
     sourceFile: cleanTextLine(node.sourceFile || ""),
     sourceSheet: cleanTextLine(node.sourceSheet || ""),
     sourceRow: Number(node.sourceRow || 0),
-    x: clampNumber(Number(node.x), 5, 95),
-    y: clampNumber(Number(node.y), 8, 92)
+    x: clampNumber(Number(node.x), PUBLICATION_FIELD_MIN, PUBLICATION_FIELD_MAX),
+    y: clampNumber(Number(node.y), PUBLICATION_FIELD_MIN, PUBLICATION_FIELD_MAX)
   };
 }
 
@@ -3615,7 +3633,7 @@ function normalizePublicationConfig(value) {
   const source = value && typeof value === "object" ? value : DEFAULT_PUBLICATION_CONFIG;
   return {
     intensity: clampNumber(Number(source.intensity), 40, 100),
-    nodeSize: clampNumber(Number(source.nodeSize), 44, 86),
+    nodeSize: clampNumber(Number(source.nodeSize), 18, 70),
     lineWidth: clampNumber(Number(source.lineWidth), 1, 8),
     showLabels: source.showLabels !== false,
     focusLinksOnSelection: source.focusLinksOnSelection !== false,

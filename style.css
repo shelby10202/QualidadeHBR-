@@ -3021,7 +3021,7 @@ button {
 }
 
 .publication-canvas {
-  --publication-node-size: 62px;
+  --publication-node-size: 32px;
   --publication-cell-intensity: 0.82;
   position: relative;
   min-height: 0;
