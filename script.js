@@ -437,6 +437,7 @@ const DOCUMENT_IMPORT_FIELDS = [
   { key: "nomeDocumento", label: "Nome do documento", aliases: ["nome do documento", "nome documento", "titulo", "título", "descricao", "descrição", "document title"] },
   { key: "setor", label: "Setor", aliases: ["setor", "area", "área", "setor responsavel", "setor responsável"] },
   { key: "setorAdjacente", label: "Setor adjacente", aliases: ["setor adjacente", "adjacente", "setor impactado", "impacto", "relacao", "relação"] },
+  { key: "documentosRelacionados", label: "Documentos relacionados (código)", aliases: ["documentos relacionados", "documento relacionado", "codigo relacionado", "código relacionado", "codigos relacionados", "códigos relacionados", "referencia", "referência", "referencias", "referências", "documentos vinculados", "vinculado a", "relacionado a", "codigos vinculados"] },
   { key: "desenvolvidoPor", label: "Desenvolvido por", aliases: ["desenvolvido por", "desenvolvedor", "elaborado por", "autor", "responsavel", "responsável"] },
   { key: "revisoes", label: "Revisões", aliases: ["revisoes", "revisões", "revisao", "revisão", "rev", "versao", "versão"] }
 ];
@@ -1462,6 +1463,7 @@ function createPublicationNodesFromDocumentRows(documents) {
       documento: cleanTextLine(record.documento || type),
       sector: cleanTextLine(record.setor || "Publicações"),
       adjacentSector: cleanTextLine(record.setorAdjacente || ""),
+      relatedCodes: cleanTextLine(record.documentosRelacionados || ""),
       developedBy: cleanTextLine(record.desenvolvidoPor || ""),
       revisions: cleanTextLine(record.revisoes || ""),
       sourceFile: documentImportState.fileName,
@@ -1473,9 +1475,13 @@ function createPublicationNodesFromDocumentRows(documents) {
   });
 }
 
-// Suporta redes grandes (milhares de documentos): indexa por setor em vez de
-// comparar cada nó com todos os outros (O(n) em vez de O(n²)).
+// Suporta redes grandes (milhares de documentos): indexa por código/setor em
+// vez de comparar cada nó com todos os outros (O(n) em vez de O(n²)).
 const PUBLICATION_LINKS_MAX_PER_NODE = 20;
+
+function normalizeDocumentCode(value) {
+  return normalizeText(value).replace(/[^A-Z0-9]/g, "");
+}
 
 function createPublicationLinksFromDocumentRows(nodes) {
   const links = [];
@@ -1489,6 +1495,28 @@ function createPublicationLinksFromDocumentRows(nodes) {
     links.push({ from, to });
   };
 
+  // Conexão principal: cada documento se liga aos códigos que ele mesmo lista
+  // na coluna "Documentos relacionados" (mapeada no import). Isso reflete a
+  // relação real entre documentos em vez de agrupar tudo que está no mesmo
+  // setor, o que gerava uma rede muito mais densa (e confusa) do que o real.
+  const codeToNode = new Map();
+  nodes.forEach((node) => {
+    const key = normalizeDocumentCode(node.code);
+    if (key && !codeToNode.has(key)) codeToNode.set(key, node);
+  });
+
+  nodes.forEach((node) => {
+    const relatedCodes = splitDocumentImportList(node.relatedCodes).map(normalizeDocumentCode).filter(Boolean);
+    relatedCodes.forEach((codeKey) => {
+      const target = codeToNode.get(codeKey);
+      if (target) addLink(node.id, target.id);
+    });
+  });
+
+  if (links.length) return links;
+
+  // Sem coluna de códigos relacionados preenchida: cai para o agrupamento por
+  // setor/setor adjacente, como antes.
   const bySector = new Map();
   nodes.forEach((node) => {
     const key = normalizeSpreadsheetFieldName(node.sector || "Publicações");
@@ -3450,6 +3478,7 @@ function renderPublicationInfoPanel() {
     ["Nome do documento", selected.title],
     ["Setor", selected.sector || "Publicações"],
     ["Setor adjacente", selected.adjacentSector || "-"],
+    ["Documentos relacionados (código)", selected.relatedCodes || "-"],
     ["Desenvolvido por", selected.developedBy || "-"],
     ["Revisões", selected.revisions || "-"],
     ["Vínculos", linkedCodes],
