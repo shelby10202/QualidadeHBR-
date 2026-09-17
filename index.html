@@ -59,7 +59,7 @@
     <div class="bar bar--bottom"></div>
   </label>
 
-  <aside class="sidebar sidebar-tree-shell">
+  <aside class="sidebar">
     <div class="sidebar-brand">
       <img class="brand-logo" src="assets/hbr-logo.png" alt="HBR">
       <div>
@@ -67,117 +67,65 @@
       </div>
     </div>
 
-    <nav class="tree-container sidebar-tree" aria-label="Navegação principal">
-      <ul>
-        <li class="tree-item">
-          <input type="checkbox" id="folder-hbr" class="tree-toggle" checked>
-          <label for="folder-hbr" class="tree-label">
-            <svg class="icon folder-closed-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 2H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"></path>
-            </svg>
-            <svg class="icon folder-open-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 2H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"></path>
-              <path d="M2 10h20"></path>
-            </svg>
-            HBR
-          </label>
+    <nav class="gh-nav" aria-label="Navegação principal">
+      <div class="gh-nav-group">
+        <p class="gh-nav-label">Qualidade</p>
+        <button type="button" class="gh-nav-item is-selected" data-tab-target="tabela" onclick="showTab('tabela')">
+          <svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="8" y1="6" x2="21" y2="6"></line>
+            <line x1="8" y1="12" x2="21" y2="12"></line>
+            <line x1="8" y1="18" x2="21" y2="18"></line>
+            <line x1="3" y1="6" x2="3.01" y2="6"></line>
+            <line x1="3" y1="12" x2="3.01" y2="12"></line>
+            <line x1="3" y1="18" x2="3.01" y2="18"></line>
+          </svg>
+          Lista atual
+        </button>
+        <button type="button" class="gh-nav-item" data-tab-target="dashboard" onclick="showTab('dashboard')">
+          <svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="3" width="7" height="7"></rect>
+            <rect x="14" y="3" width="7" height="7"></rect>
+            <rect x="14" y="14" width="7" height="7"></rect>
+            <rect x="3" y="14" width="7" height="7"></rect>
+          </svg>
+          Dashboard
+        </button>
+        <button type="button" class="gh-nav-item" data-tab-target="historico" onclick="showTab('historico')">
+          <svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"></circle>
+            <polyline points="12 6 12 12 16 14"></polyline>
+          </svg>
+          Histórico
+        </button>
+      </div>
 
-          <div class="tree-children-wrapper">
-            <ul class="tree-children">
-              <li class="tree-item">
-                <input type="checkbox" id="folder-quarentena" class="tree-toggle" checked>
-                <label for="folder-quarentena" class="tree-label">
-                  <svg class="icon folder-closed-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 2H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"></path>
-                  </svg>
-                  <svg class="icon folder-open-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 2H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"></path>
-                    <path d="M2 10h20"></path>
-                  </svg>
-                  Qualidade
-                </label>
-
-                <div class="tree-children-wrapper">
-                  <ul class="tree-children">
-                    <li class="tree-item">
-                      <button type="button" class="file-item is-selected" data-tab-target="tabela" onclick="showTab('tabela')">
-                        <svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                          <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"></path>
-                          <polyline points="14 2 14 8 20 8"></polyline>
-                        </svg>
-                        Lista atual
-                      </button>
-                    </li>
-                    <li class="tree-item">
-                      <button type="button" class="file-item" data-tab-target="dashboard" onclick="showTab('dashboard')">
-                        <svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                          <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"></path>
-                          <polyline points="14 2 14 8 20 8"></polyline>
-                        </svg>
-                        Dashboard
-                      </button>
-                    </li>
-                    <li class="tree-item">
-                      <button type="button" class="file-item" data-tab-target="historico" onclick="showTab('historico')">
-                        <svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                          <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"></path>
-                          <polyline points="14 2 14 8 20 8"></polyline>
-                        </svg>
-                        Histórico
-                      </button>
-                    </li>
-                  </ul>
-                </div>
-              </li>
-
-              <li class="tree-item">
-                <input type="checkbox" id="folder-publicacoes" class="tree-toggle" checked>
-                <label for="folder-publicacoes" class="tree-label tree-section-label">
-                  <svg class="icon folder-closed-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 2H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"></path>
-                  </svg>
-                  <svg class="icon folder-open-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 2H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"></path>
-                    <path d="M2 10h20"></path>
-                  </svg>
-                  Publicações
-                </label>
-                <div class="tree-children-wrapper">
-                  <ul class="tree-children">
-                    <li class="tree-item">
-                      <button type="button" class="file-item" data-tab-target="publicacoes" onclick="showTab('publicacoes')">
-                        <svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                          <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"></path>
-                          <polyline points="14 2 14 8 20 8"></polyline>
-                        </svg>
-                        Rede técnica
-                      </button>
-                    </li>
-                    <li class="tree-item">
-                      <button type="button" class="file-item" data-tab-target="adPesquisa" onclick="showTab('adPesquisa')">
-                        <svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                          <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"></path>
-                          <polyline points="14 2 14 8 20 8"></polyline>
-                        </svg>
-                        Pesquisa de ADs
-                      </button>
-                    </li>
-                    <li class="tree-item">
-                      <button type="button" class="file-item" data-tab-target="adNotificacoes" onclick="showTab('adNotificacoes')">
-                        <svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                          <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"></path>
-                          <polyline points="14 2 14 8 20 8"></polyline>
-                        </svg>
-                        Notificações de AD
-                      </button>
-                    </li>
-                  </ul>
-                </div>
-              </li>
-            </ul>
-          </div>
-        </li>
-      </ul>
+      <div class="gh-nav-group">
+        <p class="gh-nav-label">Publicações</p>
+        <button type="button" class="gh-nav-item" data-tab-target="publicacoes" onclick="showTab('publicacoes')">
+          <svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="18" cy="5" r="3"></circle>
+            <circle cx="6" cy="12" r="3"></circle>
+            <circle cx="18" cy="19" r="3"></circle>
+            <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
+            <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
+          </svg>
+          Rede técnica
+        </button>
+        <button type="button" class="gh-nav-item" data-tab-target="adPesquisa" onclick="showTab('adPesquisa')">
+          <svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          </svg>
+          Pesquisa de ADs
+        </button>
+        <button type="button" class="gh-nav-item" data-tab-target="adNotificacoes" onclick="showTab('adNotificacoes')">
+          <svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+            <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+          </svg>
+          Notificações de AD
+        </button>
+      </div>
     </nav>
 
     <div class="sidebar-user">
@@ -357,23 +305,27 @@
 
     <section id="publicacoes" class="tab">
       <div class="publications-page">
+        <div class="page-heading">
+          <div>
+            <p class="eyebrow">Publicações técnicas</p>
+            <h1>Rede de documentos</h1>
+            <p class="page-subtitle">FQs, ITs e PRQs ligados para prever impacto de alterações nos setores.</p>
+          </div>
+
+          <div class="total-pill">
+            <span id="publicationTotalNodes">0</span>
+            <small>documentos</small>
+          </div>
+        </div>
+
         <div id="publicationShell" class="publications-shell">
           <section class="publication-network-card">
             <div class="publication-network-head">
               <div>
-                <span>Rede neural · Publicações técnicas</span>
+                <span>Rede neural</span>
                 <strong id="publicationNetworkTitle">Impacto documental</strong>
               </div>
-              <div class="publication-head-total">
-                <span id="publicationTotalNodes">0</span>
-                <small>documentos</small>
-              </div>
               <div class="publication-head-actions">
-                <div class="publication-zoom-controls">
-                  <button type="button" id="publicationZoomOutBtn" class="publication-ghost-btn" aria-label="Diminuir zoom">−</button>
-                  <button type="button" id="publicationZoomResetBtn" class="publication-ghost-btn" aria-label="Redefinir zoom"><span id="publicationZoomLevel">100%</span></button>
-                  <button type="button" id="publicationZoomInBtn" class="publication-ghost-btn" aria-label="Aumentar zoom">+</button>
-                </div>
                 <button type="button" id="publicationResetViewBtn" class="publication-ghost-btn">Reorganizar</button>
                 <button type="button" id="publicationMenuBtn" class="publication-menu-btn" aria-label="Abrir menu de Publicações" aria-expanded="false">
                   <span></span>
@@ -384,10 +336,8 @@
             </div>
 
             <div id="publicationCanvas" class="publication-canvas" aria-label="Rede de documentos técnicos">
-              <div id="publicationZoomLayer" class="publication-zoom-layer">
-                <svg id="publicationLinks" class="publication-links" aria-hidden="true"></svg>
-                <div id="publicationNodes" class="publication-nodes"></div>
-              </div>
+              <svg id="publicationLinks" class="publication-links" aria-hidden="true"></svg>
+              <div id="publicationNodes" class="publication-nodes"></div>
             </div>
           </section>
 
@@ -445,7 +395,7 @@
               </label>
               <label class="publication-range">
                 <span>Tamanho das células</span>
-                <input id="publicationNodeSize" type="range" min="18" max="70" value="32">
+                <input id="publicationNodeSize" type="range" min="44" max="86" value="62">
               </label>
               <label class="publication-range">
                 <span>Espessura dos links</span>
@@ -454,10 +404,6 @@
               <label class="publication-switch">
                 <span>Rótulos</span>
                 <input id="publicationLabelsToggle" type="checkbox" checked>
-              </label>
-              <label class="publication-switch">
-                <span>Só conexões selecionadas</span>
-                <input id="publicationFocusLinksToggle" type="checkbox">
               </label>
               <button type="button" id="publicationAnimateBtn" class="modal-action">Animar</button>
             </details>
@@ -472,7 +418,7 @@
           <div>
             <p class="eyebrow">Publicações técnicas</p>
             <h1>Pesquisa de ADs</h1>
-            <p class="page-subtitle">Monitoramento de FAA, EASA e ANAC usando a EO fixa da HBR Osasco.</p>
+            <p class="page-subtitle">Monitoramento de FAA, EASA e ANAC usando a EO fixa do HBR Osasco.</p>
           </div>
 
           <div class="total-pill">
@@ -550,8 +496,8 @@
         <div class="page-heading">
           <div>
             <p class="eyebrow">Publicações técnicas</p>
-            <h1>Notificações de AD</h1>
-            <p class="page-subtitle">Alertas gerados a partir da lista consolidada de ADs e dos motores por linha.</p>
+            <h1>Dashboard de notificações</h1>
+            <p class="page-subtitle">Panorama consolidado dos alertas gerados a partir da lista de ADs e dos motores por linha.</p>
           </div>
 
           <div class="total-pill">
@@ -560,17 +506,69 @@
           </div>
         </div>
 
-        <div class="ad-control-strip ad-notification-strip">
-          <div>
-            <span>Mandatórias</span>
-            <strong id="adNotificationMandatory">0</strong>
+        <div class="dashboard-kpis ad-notification-kpis">
+          <article class="metric-card metric-ad-mandatory">
+            <div class="metric-icon">M</div>
+            <div>
+              <span>Mandatórias</span>
+              <strong id="adNotificationMandatory">0</strong>
+            </div>
+          </article>
+
+          <article class="metric-card metric-ad-proposal">
+            <div class="metric-icon">P</div>
+            <div>
+              <span>Propostas / acompanhamento</span>
+              <strong id="adNotificationProposal">0</strong>
+            </div>
+          </article>
+
+          <article class="metric-card metric-ad-critical">
+            <div class="metric-icon">!</div>
+            <div>
+              <span>Ação crítica agora</span>
+              <strong id="adNotificationCritical">0</strong>
+            </div>
+          </article>
+
+          <article class="metric-card metric-ad-lines">
+            <div class="metric-icon">L</div>
+            <div>
+              <span>Linhas HBR com alerta</span>
+              <strong id="adNotificationLinesActive">0</strong>
+            </div>
+          </article>
+        </div>
+
+        <div class="ad-dashboard-grid">
+          <article class="ad-panel ad-dashboard-chart-panel">
+            <div class="ad-panel-head">
+              <span>Distribuição</span>
+              <strong>Alertas por linha do HBR</strong>
+            </div>
+            <div class="ad-chart-frame">
+              <canvas id="adNotificationLineChart"></canvas>
+            </div>
+          </article>
+
+          <article class="ad-panel ad-dashboard-chart-panel">
+            <div class="ad-panel-head">
+              <span>Distribuição</span>
+              <strong>Alertas por autoridade</strong>
+            </div>
+            <div class="ad-chart-frame">
+              <canvas id="adNotificationAuthorityChart"></canvas>
+            </div>
+          </article>
+        </div>
+
+        <article class="ad-panel ad-notification-panel ad-mini-alert-panel">
+          <div class="ad-panel-head">
+            <span>Mini lista de alertas</span>
+            <strong>ADs monitoradas</strong>
           </div>
-          <div>
-            <span>Propostas</span>
-            <strong id="adNotificationProposal">0</strong>
-          </div>
-          <label class="ad-notification-control">
-            <span>Linha</span>
+          <label class="ad-notification-control ad-mini-alert-filter">
+            <span>Filtrar por linha</span>
             <select id="adNotificationLineFilter" class="input-custom">
               <option value="all">Todas as linhas</option>
               <option value="AIRBUS">Airbus / Helibras</option>
@@ -579,23 +577,7 @@
               <option value="ROBINSON">Robinson</option>
             </select>
           </label>
-          <label class="ad-notification-control">
-            <span>Organizar</span>
-            <select id="adNotificationDateSort" class="input-custom">
-              <option value="newest">Mais recentes</option>
-              <option value="oldest">Mais antigas</option>
-              <option value="effective-newest">Efetivas recentes</option>
-              <option value="effective-oldest">Efetivas antigas</option>
-            </select>
-          </label>
-        </div>
-
-        <article class="ad-panel ad-notification-panel">
-          <div class="ad-panel-head">
-            <span>Lista de alertas</span>
-            <strong>ADs monitoradas</strong>
-          </div>
-          <div id="adNotificationsList" class="ad-notifications-list"></div>
+          <div id="adNotificationsList" class="ad-notifications-list ad-notifications-list-mini"></div>
         </article>
       </div>
     </section>
