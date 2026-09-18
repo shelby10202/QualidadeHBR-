@@ -1430,6 +1430,20 @@ async function addAuditNc(fields) {
   return ref.id;
 }
 
+// Gera um número de NC/OM limpo e sequencial por auditoria (ex: NC001, NC002, OM001),
+// em vez de embutir o número da auditoria ou o código do checklist no identificador.
+function nextSequentialNcNumber(auditNumber, type) {
+  const prefix = normalizeText(type || "") === "om" ? "OM" : "NC";
+  let maxN = 0;
+  auditNcData.forEach((item) => {
+    if (item.auditNumber !== auditNumber) return;
+    if (normalizeText(item.type || "") !== normalizeText(type || "")) return;
+    const match = /^(?:NC|OM)\s*0*(\d+)$/i.exec(String(item.ncNumber || "").trim());
+    if (match) maxN = Math.max(maxN, parseInt(match[1], 10));
+  });
+  return `${prefix}${String(maxN + 1).padStart(3, "0")}`;
+}
+
 async function updateAuditNcRecord(id, fields) {
   await updateDoc(doc(db, "nao_conformidades", id), fields);
   const idx = auditNcData.findIndex((item) => item.id === id);
@@ -1609,7 +1623,7 @@ async function buildFq073Data(auditoria) {
       numero: String(index + 1).padStart(3, "0"),
       setorArea: `${setor || "-"}${item.ncNumber ? ` — Ref: ${item.ncNumber}` : ""}`,
       evidenciaObjetiva: item.description || "",
-      requisito: "",
+      requisito: item.requisito || "",
       avaliacaoRisco: item.riskAnalysis || "",
       prazo: formatAuditDateForDoc(item.deadline),
       _record: item
@@ -2313,7 +2327,7 @@ function renderAuditCriarLista() {
 async function deleteAuditoria(auditoria) {
   const relatedChecklists = auditoriaChecklistsFor(auditoria.id);
   const warn = relatedChecklists.length
-    ? `Esta auditoria tem ${relatedChecklists.length} checklist(s) preenchido(s), que também serão excluídos. As não conformidades já geradas na Operação de Auditoria NÃO serão apagadas. `
+    ? `Esta auditoria tem ${relatedChecklists.length} checklist(s) preenchido(s), que também serão excluídos. As não conformidades já geradas em NC e OM NÃO serão apagadas. `
     : "";
   const confirmed = confirm(`${warn}Tem certeza que deseja excluir a auditoria "${auditoria.auditNumber || "Sem número"}"? Esta ação não pode ser desfeita.`);
   if (!confirmed) return;
@@ -2527,7 +2541,7 @@ function openAuditCriarFill(template, existingChecklist) {
 
   if (existingChecklist) {
     (existingChecklist.items || []).forEach((it) => {
-      auditCriarCurrentValues[it.n] = { status: it.status || "", nota: it.nota || "" };
+      auditCriarCurrentValues[it.n] = { status: it.status || "", nota: it.nota || "", fotos: it.fotos || [] };
     });
     auditCriarCurrentGrcFields = { ...(existingChecklist.grcFields || {}) };
   }
@@ -2567,7 +2581,35 @@ function renderAuditCriarFillForm(existingChecklist) {
         <h3>${escapeHtml(cat.name)}</h3>
         ${cat.items
           .map((item) => {
-            const current = auditCriarCurrentValues[item.n] || { status: "", nota: "" };
+            const current = auditCriarCurrentValues[item.n] || { status: "", nota: "", fotos: [] };
+            const currentFotos = current.fotos || [];
+            const itemIsFinding = ["", ...auditChecklistFindingStatuses(template.kind)].includes(current.status);
+            const showPhotosBlock = !readOnly || currentFotos.length > 0;
+            const photosHtml = showPhotosBlock
+              ? `
+              <div class="audit-criar-item-photos" ${itemIsFinding ? "" : "hidden"}>
+                <div class="audit-criar-item-photos-head">
+                  <span class="audit-criar-item-photos-title">Fotos do item</span>
+                  ${
+                    readOnly
+                      ? ""
+                      : `<label class="audit-photo-upload-btn audit-photo-upload-btn-sm">+ Fotos<input type="file" class="audit-criar-item-photo-input" accept="image/*" multiple hidden></label>`
+                  }
+                </div>
+                <div class="audit-photo-grid audit-photo-grid-sm" data-item-photo-grid>
+                  ${currentFotos
+                    .map(
+                      (foto, idx) => `
+                    <div class="audit-photo-item" data-photo-index="${idx}">
+                      <img src="${escapeHtml(foto.url)}" alt="Foto do item" loading="lazy">
+                      ${readOnly ? "" : `<button type="button" class="audit-photo-remove" title="Remover foto">&times;</button>`}
+                    </div>`
+                    )
+                    .join("")}
+                </div>
+                <p class="audit-criar-item-photo-message"></p>
+              </div>`
+              : "";
             return `
             <div class="audit-criar-item" data-item-n="${item.n}">
               <div class="audit-criar-item-text"><strong>${item.n}.</strong> ${escapeHtml(item.text)}</div>
@@ -2581,7 +2623,8 @@ function renderAuditCriarFillForm(existingChecklist) {
                   .join("")}
               </div>
               <textarea class="input-custom audit-criar-item-nota" placeholder="Observação / evidência (obrigatório para ${auditChecklistFindingStatuses(template.kind).join(" e ")})"
-                ${["", ...auditChecklistFindingStatuses(template.kind)].includes(current.status) ? "" : "hidden"} ${readOnly ? "disabled" : ""}>${escapeHtml(current.nota || "")}</textarea>
+                ${itemIsFinding ? "" : "hidden"} ${readOnly ? "disabled" : ""}>${escapeHtml(current.nota || "")}</textarea>
+              ${photosHtml}
             </div>`;
           })
           .join("")}
@@ -2646,6 +2689,59 @@ function renderAuditCriarFillForm(existingChecklist) {
   el.auditCriarFillContainer.querySelectorAll(".audit-criar-item").forEach((itemEl) => {
     const n = Number(itemEl.dataset.itemN);
     const notaEl = itemEl.querySelector(".audit-criar-item-nota");
+    const photosBlockEl = itemEl.querySelector(".audit-criar-item-photos");
+    const photoInputEl = itemEl.querySelector(".audit-criar-item-photo-input");
+    const photoGridEl = itemEl.querySelector("[data-item-photo-grid]");
+    const photoMsgEl = itemEl.querySelector(".audit-criar-item-photo-message");
+
+    const renderItemPhotoGrid = () => {
+      if (!photoGridEl) return;
+      const fotos = auditCriarCurrentValues[n]?.fotos || [];
+      photoGridEl.innerHTML = "";
+      fotos.forEach((foto, idx) => {
+        const div = document.createElement("div");
+        div.className = "audit-photo-item";
+        div.innerHTML = `
+          <img src="${escapeHtml(foto.url)}" alt="Foto do item" loading="lazy">
+          <button type="button" class="audit-photo-remove" title="Remover foto">&times;</button>
+        `;
+        div.querySelector(".audit-photo-remove")?.addEventListener("click", async () => {
+          const fotosAtuais = [...(auditCriarCurrentValues[n]?.fotos || [])];
+          const [removed] = fotosAtuais.splice(idx, 1);
+          if (!removed) return;
+          auditCriarCurrentValues[n] = { ...(auditCriarCurrentValues[n] || {}), fotos: fotosAtuais };
+          renderItemPhotoGrid();
+          await deletePhotoFromStorage(removed);
+        });
+        photoGridEl.appendChild(div);
+      });
+    };
+
+    photoInputEl?.addEventListener("change", async () => {
+      if (!photoInputEl.files?.length) return;
+      const files = Array.from(photoInputEl.files);
+      if (photoMsgEl) photoMsgEl.textContent = "Enviando fotos...";
+      try {
+        const uploaded = await uploadPhotosToStorage(
+          files,
+          `auditorias/${auditCriarCurrentAuditoria?.id || "sem-auditoria"}/checklist_items/${template.code}/${n}`
+        );
+        auditCriarCurrentValues[n] = {
+          ...(auditCriarCurrentValues[n] || {}),
+          fotos: [...(auditCriarCurrentValues[n]?.fotos || []), ...uploaded]
+        };
+        if (photoMsgEl) photoMsgEl.textContent = "";
+        renderItemPhotoGrid();
+      } catch (err) {
+        console.error("Erro ao enviar fotos do item.", err);
+        if (photoMsgEl) {
+          photoMsgEl.textContent = `Não foi possível enviar as fotos: "${err?.message || err}".`;
+        }
+      } finally {
+        photoInputEl.value = "";
+      }
+    });
+
     itemEl.querySelectorAll(".audit-criar-status-btn").forEach((btn) => {
       btn.addEventListener("click", () => {
         const value = btn.dataset.statusValue;
@@ -2653,6 +2749,7 @@ function renderAuditCriarFillForm(existingChecklist) {
         auditCriarCurrentValues[n] = { ...(auditCriarCurrentValues[n] || {}), status: value };
         const needsNota = auditChecklistFindingStatuses(template.kind).includes(value);
         if (notaEl) notaEl.hidden = !needsNota;
+        if (photosBlockEl) photosBlockEl.hidden = !needsNota;
       });
     });
     if (notaEl) {
@@ -2717,7 +2814,8 @@ async function handleAuditCriarFillSubmit(event) {
       categoria: item.categoria,
       descricao: item.text,
       status: auditCriarCurrentValues[item.n].status,
-      nota: auditCriarCurrentValues[item.n].nota || ""
+      nota: auditCriarCurrentValues[item.n].nota || "",
+      fotos: auditCriarCurrentValues[item.n].fotos || []
     }));
 
     const checklistPayload = {
@@ -2752,7 +2850,7 @@ async function handleAuditCriarFillSubmit(event) {
     for (const item of findings) {
       const value = auditCriarCurrentValues[item.n];
       const type = value.status === "NOK" ? "NC" : value.status;
-      const ncNumber = `${template.code}-${auditoria.auditNumber || "SN"}-${item.n}`;
+      const ncNumber = nextSequentialNcNumber(auditoria.auditNumber || "", type);
       await addAuditNc({
         description: value.nota ? `${item.text} — Nota do auditor: ${value.nota}` : item.text,
         auditType: auditoria.auditType || "",
@@ -2760,6 +2858,10 @@ async function handleAuditCriarFillSubmit(event) {
         auditNumber: auditoria.auditNumber || "",
         type,
         ncNumber,
+        requisito: item.text,
+        fotos: value.fotos || [],
+        sourceChecklistCode: template.code,
+        sourceItemN: item.n,
         base: auditoria.base || "",
         status: "Open",
         step: "Open",
@@ -2785,7 +2887,7 @@ async function handleAuditCriarFillSubmit(event) {
     setMsg("");
     alert(
       findings.length
-        ? `Checklist concluído! ${findings.length} não conformidade(s)/oportunidade(s) foram criadas na Operação de Auditoria.`
+        ? `Checklist concluído! ${findings.length} não conformidade(s)/oportunidade(s) foram criadas em NC e OM.`
         : "Checklist concluído! Nenhum item fora de conformidade."
     );
     openAuditCriarPicker(auditoria);

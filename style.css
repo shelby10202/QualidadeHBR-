@@ -5174,6 +5174,61 @@ button {
   display: none;
 }
 
+.audit-criar-item-photos {
+  margin-top: 4px;
+  padding: 10px;
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.audit-criar-item-photos[hidden] {
+  display: none;
+}
+
+.audit-criar-item-photos-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.audit-criar-item-photos-title {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.audit-photo-upload-btn-sm {
+  min-height: 26px;
+  padding: 0 10px;
+  font-size: 11px;
+}
+
+.audit-photo-grid-sm {
+  grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
+  gap: 6px;
+}
+
+.audit-photo-grid-sm .audit-photo-remove {
+  width: 18px;
+  height: 18px;
+  font-size: 12px;
+}
+
+.audit-criar-item-photo-message {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.audit-criar-item-photo-message:empty {
+  display: none;
+}
+
 @media (max-width: 720px) {
   .audit-checklist-grid {
     grid-template-columns: 1fr;
