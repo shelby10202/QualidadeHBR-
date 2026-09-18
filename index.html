@@ -773,10 +773,20 @@
       </div>
 
       <div id="auditCriarStepLista">
+        <div class="gallery-toolbar">
+          <div class="search-box">
+            <input id="auditCriarSearch" type="search" placeholder="Buscar por N° da auditoria, base, tipo...">
+          </div>
+          <button type="button" id="auditCriarNewBtn" class="modal-action audit-new-btn">Nova auditoria</button>
+        </div>
+
         <div id="auditCriarOverview" class="audit-criar-overview" hidden>
           <div class="audit-criar-overview-head">
             <h2>Resumo das Auditorias</h2>
-            <span id="auditCriarOverviewPeriod" class="audit-criar-overview-period"></span>
+            <div class="audit-criar-overview-head-actions">
+              <span id="auditCriarOverviewPeriod" class="audit-criar-overview-period"></span>
+              <button type="button" id="auditCriarOverviewOpenBtn" class="modal-action secondary audit-criar-overview-open-btn">Abrir auditoria</button>
+            </div>
           </div>
           <div class="audit-criar-overview-body">
             <nav id="auditCriarOverviewNav" class="audit-criar-overview-nav" aria-label="Lista de auditorias"></nav>
@@ -799,15 +809,6 @@
           </div>
         </div>
         <p id="auditCriarOverviewEmpty" class="empty-state" hidden>Crie sua primeira auditoria para ver o resumo aqui.</p>
-
-        <div class="gallery-toolbar">
-          <div class="search-box">
-            <input id="auditCriarSearch" type="search" placeholder="Buscar por N° da auditoria, base, tipo...">
-          </div>
-          <button type="button" id="auditCriarNewBtn" class="modal-action audit-new-btn">Nova auditoria</button>
-        </div>
-        <div id="auditCriarList" class="audit-criar-list"></div>
-        <div id="auditCriarEmptyState" class="empty-state" hidden>Nenhuma auditoria criada ainda.</div>
       </div>
 
       <div id="auditCriarStepForm" hidden>

@@ -921,10 +921,9 @@ const el = {
   auditCriarStepFill: document.getElementById("auditCriarStepFill"),
   auditCriarSearch: document.getElementById("auditCriarSearch"),
   auditCriarNewBtn: document.getElementById("auditCriarNewBtn"),
-  auditCriarList: document.getElementById("auditCriarList"),
-  auditCriarEmptyState: document.getElementById("auditCriarEmptyState"),
   auditCriarOverview: document.getElementById("auditCriarOverview"),
   auditCriarOverviewPeriod: document.getElementById("auditCriarOverviewPeriod"),
+  auditCriarOverviewOpenBtn: document.getElementById("auditCriarOverviewOpenBtn"),
   auditCriarOverviewNav: document.getElementById("auditCriarOverviewNav"),
   auditCriarOverviewStats: document.getElementById("auditCriarOverviewStats"),
   auditCriarOverviewSummary: document.getElementById("auditCriarOverviewSummary"),
@@ -1088,6 +1087,7 @@ let auditCriarCurrentChecklist = null; // template object da checklist em preenc
 let auditCriarCurrentValues = {}; // { itemN: { status, nota } }
 let auditCriarCurrentGrcFields = {};
 let auditCriarOverviewSelectedId = null;
+let auditCriarOverviewSelectedAuditoria = null;
 let auditCriarOverviewChart = null;
 
 function prepareStaticShells() {
@@ -2315,41 +2315,88 @@ function auditoriaChecklistsFor(auditoriaId) {
 function renderAuditCriarOverview() {
   if (!el.auditCriarOverviewNav) return;
 
-  const list = [...auditoriasData].sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")));
+  const allList = [...auditoriasData].sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")));
 
-  if (!list.length) {
+  if (!allList.length) {
     if (el.auditCriarOverview) el.auditCriarOverview.hidden = true;
-    if (el.auditCriarOverviewEmpty) el.auditCriarOverviewEmpty.hidden = false;
+    if (el.auditCriarOverviewEmpty) {
+      el.auditCriarOverviewEmpty.hidden = false;
+      el.auditCriarOverviewEmpty.textContent = "Crie sua primeira auditoria para ver o resumo aqui.";
+    }
+    auditCriarOverviewSelectedAuditoria = null;
+    if (el.auditCriarOverviewOpenBtn) el.auditCriarOverviewOpenBtn.disabled = true;
     return;
   }
   if (el.auditCriarOverview) el.auditCriarOverview.hidden = false;
   if (el.auditCriarOverviewEmpty) el.auditCriarOverviewEmpty.hidden = true;
 
-  if (!auditCriarOverviewSelectedId || !list.some((a) => a.id === auditCriarOverviewSelectedId)) {
-    auditCriarOverviewSelectedId = list[0].id;
-  }
+  const term = normalizeText(auditCriarSearchTerm);
+  const list = allList.filter((a) => {
+    if (!term) return true;
+    const haystack = normalizeText(`${a.auditNumber || ""} ${a.base || ""} ${a.auditType || ""} ${a.client || ""}`);
+    return haystack.includes(term);
+  });
 
   if (el.auditCriarOverviewPeriod) {
-    el.auditCriarOverviewPeriod.textContent = `${list.length} auditoria${list.length === 1 ? "" : "s"} no total`;
+    el.auditCriarOverviewPeriod.textContent = term
+      ? `${list.length} auditoria${list.length === 1 ? "" : "s"} encontrada${list.length === 1 ? "" : "s"}`
+      : `${list.length} auditoria${list.length === 1 ? "" : "s"} no total`;
+  }
+
+  if (!list.length) {
+    el.auditCriarOverviewNav.innerHTML = `<p class="audit-criar-overview-nav-empty">Nenhuma auditoria encontrada para essa busca.</p>`;
+    if (el.auditCriarOverviewStats) el.auditCriarOverviewStats.innerHTML = "";
+    if (el.auditCriarOverviewSummary) el.auditCriarOverviewSummary.textContent = "";
+    const wrap = el.auditCriarOverviewChart?.parentElement;
+    if (wrap) wrap.hidden = true;
+    if (el.auditCriarOverviewChartEmpty) el.auditCriarOverviewChartEmpty.hidden = true;
+    if (auditCriarOverviewChart) {
+      auditCriarOverviewChart.destroy();
+      auditCriarOverviewChart = null;
+    }
+    auditCriarOverviewSelectedAuditoria = null;
+    if (el.auditCriarOverviewOpenBtn) el.auditCriarOverviewOpenBtn.disabled = true;
+    return;
+  }
+
+  if (el.auditCriarOverviewOpenBtn) el.auditCriarOverviewOpenBtn.disabled = false;
+
+  if (!auditCriarOverviewSelectedId || !list.some((a) => a.id === auditCriarOverviewSelectedId)) {
+    auditCriarOverviewSelectedId = list[0].id;
   }
 
   el.auditCriarOverviewNav.innerHTML = "";
   list.forEach((auditoria) => {
     const status = auditoria.status || "Em Progresso";
     const isActive = auditoria.id === auditCriarOverviewSelectedId;
-    const item = document.createElement("button");
-    item.type = "button";
+    const item = document.createElement("div");
     item.className = `audit-criar-overview-nav-item${isActive ? " active" : ""}`;
+    item.setAttribute("role", "button");
+    item.setAttribute("tabindex", "0");
     item.innerHTML = `
-      <span class="audit-criar-overview-nav-title">${escapeHtml(auditoria.auditNumber || "Sem número")}</span>
+      <div class="audit-criar-overview-nav-row">
+        <span class="audit-criar-overview-nav-title">${escapeHtml(auditoria.auditNumber || "Sem número")}</span>
+        <button type="button" class="audit-criar-overview-nav-delete" title="Excluir auditoria">&times;</button>
+      </div>
       <span class="audit-criar-overview-nav-meta">
         <span class="audit-status-pill ${auditoriaStatusToneClass(status)}">${escapeHtml(status)}</span>
         <span class="audit-criar-overview-nav-period">${escapeHtml(formatAuditPeriod(auditoria.dateStart, auditoria.dateEnd) || "-")}</span>
       </span>
     `;
-    item.addEventListener("click", () => {
+    const select = () => {
       auditCriarOverviewSelectedId = auditoria.id;
       renderAuditCriarOverview();
+    };
+    item.addEventListener("click", select);
+    item.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        select();
+      }
+    });
+    item.querySelector(".audit-criar-overview-nav-delete")?.addEventListener("click", (event) => {
+      event.stopPropagation();
+      deleteAuditoria(auditoria);
     });
     el.auditCriarOverviewNav.appendChild(item);
   });
@@ -2360,6 +2407,10 @@ function renderAuditCriarOverview() {
 
 function renderAuditCriarOverviewDetail(auditoria) {
   if (!auditoria) return;
+  auditCriarOverviewSelectedAuditoria = auditoria;
+  if (el.auditCriarOverviewOpenBtn) {
+    el.auditCriarOverviewOpenBtn.textContent = `Abrir ${auditoria.auditNumber || "auditoria"}`;
+  }
   const checklists = auditoriaChecklistsFor(auditoria.id);
   const totalChecklists = checklists.length;
   const totalTemplates = AUDIT_CHECKLIST_TEMPLATES.length;
@@ -2454,47 +2505,7 @@ function renderAuditCriarOverviewChart(checklists) {
 }
 
 function renderAuditCriarLista() {
-  if (!el.auditCriarList) return;
-
   renderAuditCriarOverview();
-
-  const term = normalizeText(auditCriarSearchTerm);
-  const list = [...auditoriasData]
-    .filter((a) => {
-      if (!term) return true;
-      const haystack = normalizeText(`${a.auditNumber || ""} ${a.base || ""} ${a.auditType || ""} ${a.client || ""}`);
-      return haystack.includes(term);
-    })
-    .sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")));
-
-  el.auditCriarList.innerHTML = "";
-  if (el.auditCriarEmptyState) el.auditCriarEmptyState.hidden = list.length > 0;
-
-  list.forEach((auditoria) => {
-    const done = auditoriaChecklistsFor(auditoria.id).length;
-    const card = document.createElement("article");
-    card.className = "audit-criar-card";
-    const status = auditoria.status || "Em Progresso";
-    card.innerHTML = `
-      <div class="audit-criar-card-main">
-        <strong>${escapeHtml(auditoria.auditNumber || "Sem número")}</strong>
-        <span>${escapeHtml(auditoria.base || "-")} &bull; ${escapeHtml(auditoria.auditType || "-")} &bull; ${escapeHtml(formatAuditPeriod(auditoria.dateStart, auditoria.dateEnd) || "-")}</span>
-      </div>
-      <div class="audit-criar-card-side">
-        <span class="audit-status-pill ${auditoriaStatusToneClass(status)}">${escapeHtml(status)}</span>
-        <span class="audit-status-pill ${done >= AUDIT_CHECKLIST_TEMPLATES.length ? "ok" : done > 0 ? "warning" : "empty"}">
-          ${done}/${AUDIT_CHECKLIST_TEMPLATES.length} checklists
-        </span>
-        <button type="button" class="audit-criar-delete-btn" title="Excluir auditoria">Excluir</button>
-      </div>
-    `;
-    card.addEventListener("click", () => openAuditCriarPicker(auditoria));
-    card.querySelector(".audit-criar-delete-btn")?.addEventListener("click", (event) => {
-      event.stopPropagation();
-      deleteAuditoria(auditoria);
-    });
-    el.auditCriarList.appendChild(card);
-  });
 }
 
 async function deleteAuditoria(auditoria) {
@@ -3154,6 +3165,9 @@ el.auditCriarSearch?.addEventListener("input", () => {
 });
 
 el.auditCriarNewBtn?.addEventListener("click", openAuditCriarForm);
+el.auditCriarOverviewOpenBtn?.addEventListener("click", () => {
+  if (auditCriarOverviewSelectedAuditoria) openAuditCriarPicker(auditCriarOverviewSelectedAuditoria);
+});
 el.auditCriarFormBackBtn?.addEventListener("click", () => showAuditCriarStep("lista"));
 el.auditCriarCancelBtn?.addEventListener("click", () => showAuditCriarStep("lista"));
 el.auditCriarPickerBackBtn?.addEventListener("click", () => {
