@@ -81,7 +81,7 @@
 
     <nav class="gh-nav" aria-label="Navegação principal">
       <div class="gh-nav-group">
-        <p class="gh-nav-label">Qualidade</p>
+        <p class="gh-nav-label">Quarentena</p>
         <button type="button" class="gh-nav-item is-selected" data-tab-target="tabela" onclick="showTab('tabela')" aria-current="page" title="Lista de aeronaves em quarentena">
           <svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <line x1="8" y1="6" x2="21" y2="6"></line>
@@ -163,6 +163,14 @@
           </svg>
           NC e OM
         </button>
+        <button type="button" class="gh-nav-item" data-tab-target="auditoriaPac" onclick="showTab('auditoriaPac')" title="Acompanhar e atualizar o Plano de Ação Corretiva das não conformidades já registradas">
+          <svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M9 11l3 3L22 4"></path>
+            <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5"></path>
+            <path d="M15 3h4v4"></path>
+          </svg>
+          Plano de Ação (PAC)
+        </button>
       </div>
     </nav>
 
@@ -181,10 +189,16 @@
   </aside>
 
   <main class="workspace">
+    <div id="noCargoNotice" class="no-cargo-notice" hidden>
+      <div class="no-cargo-notice-card">
+        <h2>Aguardando liberação de acesso</h2>
+        <p>Sua conta ainda não tem nenhum cargo atribuído. Peça a um administrador para liberar seu acesso no painel Admin &gt; Usuários.</p>
+      </div>
+    </div>
     <section id="tabela" class="tab active">
       <div class="page-heading">
         <div>
-          <p class="eyebrow">Qualidade</p>
+          <p class="eyebrow">Quarentena</p>
           <h1>Aeronaves em quarentena</h1>
           <p class="page-subtitle">Controle de peças e status por aeronave.</p>
         </div>
@@ -260,7 +274,7 @@
 
         <div class="dashboard-topbar">
           <div>
-            <p class="eyebrow">Qualidade</p>
+            <p class="eyebrow">Quarentena</p>
             <h1>Quarentena e saídas</h1>
           </div>
 
@@ -1142,6 +1156,55 @@
       </div>
 
       <div id="audit_empty_state" class="empty-state" hidden>
+        Nenhuma não conformidade encontrada.
+      </div>
+    </section>
+
+    <section id="auditoriaPac" class="tab">
+      <div id="audit_pac_error" class="audit-error-banner" hidden></div>
+      <div class="page-heading">
+        <div>
+          <p class="eyebrow">Auditoria</p>
+          <h1>Plano de Ação (PAC)</h1>
+          <p class="page-subtitle">Acompanhe e atualize a causa raiz, o responsável, o prazo, as prorrogações e o encerramento das não conformidades e oportunidades de melhoria já registradas.</p>
+        </div>
+        <div class="total-pill">
+          <span id="audit_pac_count">0</span>
+          <small>registros</small>
+        </div>
+      </div>
+
+      <div class="gallery-toolbar">
+        <div class="chip-row" aria-label="Filtros rápidos">
+          <button type="button" class="chip active" data-audit-pac-filter="all">Todas</button>
+          <button type="button" class="chip" data-audit-pac-filter="Open">Abertas</button>
+          <button type="button" class="chip" data-audit-pac-filter="Late">Atrasadas</button>
+          <button type="button" class="chip" data-audit-pac-filter="Done">Concluídas</button>
+        </div>
+
+        <div class="search-box">
+          <input id="auditPacSearch" type="search" placeholder="Buscar NC, descrição, responsável...">
+        </div>
+      </div>
+
+      <div class="audit-table-wrap">
+        <table class="audit-table">
+          <thead>
+            <tr>
+              <th>NC</th>
+              <th>Descrição</th>
+              <th>Setor</th>
+              <th>Status</th>
+              <th>Prazo</th>
+              <th>Responsável PAC</th>
+              <th>Ações</th>
+            </tr>
+          </thead>
+          <tbody id="audit_pac_table_body"></tbody>
+        </table>
+      </div>
+
+      <div id="audit_pac_empty_state" class="empty-state" hidden>
         Nenhuma não conformidade encontrada.
       </div>
     </section>

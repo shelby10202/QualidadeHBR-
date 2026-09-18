@@ -1037,6 +1037,90 @@ let dynamicSiteAreas = loadStoredAdminAreas();
 let adminReminders = loadStoredReminders();
 let adminHistory = loadStoredAdminHistory();
 let adminUsers = [];
+
+// ===================== Cargos e permissões por aba =====================
+// Cada usuário pode acumular um ou mais cargos (guardados em usuarios/{uid}.cargos).
+// "admin" sempre enxerga tudo. Uma conta sem o campo "cargos" definido ainda (criada
+// antes deste sistema existir) mantém acesso total, para não travar quem já usava o site.
+const CARGO_LIST = ["admin", "auditor", "pac", "publicacoes"];
+const CARGO_LABELS = {
+  admin: "Administrador",
+  auditor: "Auditor",
+  pac: "Responsável pela PAC",
+  publicacoes: "Publicações e Engenharia"
+};
+// aba -> cargos que liberam acesso (além de "admin", que sempre tem acesso a tudo).
+// A aba "admin" não entra aqui: ela continua protegida só pela senha do painel administrativo.
+const TAB_CARGO_MAP = {
+  tabela: ["admin"],
+  dashboard: ["admin"],
+  historico: ["admin"],
+  publicacoes: ["admin", "publicacoes"],
+  adPesquisa: ["admin", "publicacoes"],
+  adNotificacoes: ["admin", "publicacoes"],
+  auditoriaCriar: ["admin", "auditor"],
+  auditoriaDashboard: ["admin", "auditor", "pac"],
+  auditoriaOperacao: ["admin", "auditor"],
+  auditoriaPac: ["admin", "pac"]
+};
+// null = ainda não carregado (não bloqueia nada, evita flash de tela vazia no login).
+// "ALL" = conta antiga sem o campo "cargos" (compatibilidade: acesso total).
+// array = cargos explicitamente atribuídos pelo admin.
+let currentUserCargos = null;
+
+function userCanAccessTab(tab) {
+  const allowed = TAB_CARGO_MAP[tab];
+  if (!allowed) return true;
+  if (currentUserCargos === null || currentUserCargos === "ALL") return true;
+  if (currentUserCargos.includes("admin")) return true;
+  return allowed.some((cargo) => currentUserCargos.includes(cargo));
+}
+
+function firstAccessibleTab() {
+  return Object.keys(TAB_CARGO_MAP).find((tab) => userCanAccessTab(tab)) || null;
+}
+
+async function loadCurrentUserCargos(user) {
+  try {
+    const snap = await getDoc(doc(db, "usuarios", user.uid));
+    const rawCargos = snap.exists() ? snap.data().cargos : undefined;
+    currentUserCargos = Array.isArray(rawCargos) ? rawCargos : "ALL";
+  } catch (err) {
+    console.error("Não foi possível carregar os cargos do usuário; liberando acesso por precaução.", err);
+    currentUserCargos = "ALL";
+  }
+}
+
+function applyCargoVisibility() {
+  let anyVisibleInGroup = new Map();
+
+  document.querySelectorAll("[data-tab-target]").forEach((button) => {
+    const tab = button.dataset.tabTarget;
+    const allowed = userCanAccessTab(tab);
+    button.hidden = !allowed;
+    const group = button.closest(".gh-nav-group");
+    if (group) anyVisibleInGroup.set(group, (anyVisibleInGroup.get(group) || false) || allowed);
+  });
+
+  document.querySelectorAll(".gh-nav-group").forEach((group) => {
+    group.hidden = !anyVisibleInGroup.get(group);
+  });
+
+  const noAccessNotice = document.getElementById("noCargoNotice");
+  const currentActiveTab = document.querySelector(".tab.active")?.id;
+  if (currentActiveTab && TAB_CARGO_MAP[currentActiveTab] && !userCanAccessTab(currentActiveTab)) {
+    const fallback = firstAccessibleTab();
+    if (fallback) {
+      window.showTab(fallback);
+    } else {
+      document.querySelectorAll(".tab").forEach((t) => t.classList.remove("active"));
+      if (noAccessNotice) noAccessNotice.hidden = false;
+      return;
+    }
+  }
+  if (noAccessNotice) noAccessNotice.hidden = firstAccessibleTab() !== null;
+}
+
 let publicationNetwork = loadStoredPublicationNetwork();
 let publicationConfig = loadStoredPublicationConfig();
 let selectedPublicationId = publicationNetwork.nodes[0]?.id || null;
@@ -1069,6 +1153,17 @@ let auditNcFilter = "all";
 let auditNcSearchTerm = "";
 let auditNcAuditNumberFilter = "";
 let auditNcEditingId = null;
+let auditNcModalPacMode = false;
+let auditPacSearchTerm = "";
+let auditPacFilter = "all";
+// Campos "de identificação" da NC/OM que o cargo Responsável pela PAC não pode alterar
+// (isso é papel de quem audita/registra). No modo PAC só ficam editáveis os campos do
+// plano de ação em si: causa raiz, responsável, setor responsável, prazo, prorrogações,
+// encerramento e observações.
+const AUDIT_NC_PAC_LOCKED_FIELDS = [
+  "description", "auditType", "client", "auditNumber", "type", "ncNumber", "base",
+  "ncDate", "ncDept", "ncSector", "riskAnalysis", "recurrentNc", "needsInvestment"
+];
 let auditNcLoaded = false;
 let auditNcLoadError = "";
 let auditChart = null;
@@ -1277,6 +1372,7 @@ el.signupBtn.onclick = async () => {
         {
           email: cred.user.email || email,
           aprovado: false,
+          cargos: [],
           criadoEm: new Date().toISOString()
         },
         { merge: true }
@@ -1310,6 +1406,7 @@ onAuthStateChanged(auth, async (user) => {
     el.loaderScreen.style.display = "none";
     if (el.userEmail) el.userEmail.textContent = "";
     setLoginLoading(false);
+    currentUserCargos = null;
     return;
   }
 
@@ -1328,6 +1425,8 @@ onAuthStateChanged(auth, async (user) => {
   setLoginMessage("", "info");
   if (el.userEmail) el.userEmail.textContent = user.email;
   await saveCurrentUserPresence(user);
+  await loadCurrentUserCargos(user);
+  applyCargoVisibility();
   await carregarDados();
   el.loaderScreen.style.display = "none";
 });
@@ -1923,27 +2022,33 @@ function auditFormFieldMap() {
   };
 }
 
-function openAuditNcModal(id) {
+function openAuditNcModal(id, options = {}) {
   if (!el.auditNcModal) return;
   populateAuditFormOptions();
   auditNcEditingId = id || null;
+  auditNcModalPacMode = Boolean(options.pacMode);
   const record = id ? auditNcData.find((item) => item.id === id) : null;
   const fields = auditFormFieldMap();
 
   Object.entries(fields).forEach(([key, input]) => {
     if (!input) return;
     input.value = record ? record[key] || "" : "";
+    input.disabled = auditNcModalPacMode && AUDIT_NC_PAC_LOCKED_FIELDS.includes(key);
   });
 
   if (el.auditNcModalTitle) {
     el.auditNcModalTitle.textContent = record ? `Editar ${record.ncNumber || "não conformidade"}` : "Nova não conformidade";
   }
-  if (el.auditNcDeleteBtn) el.auditNcDeleteBtn.hidden = !record;
+  if (el.auditNcDeleteBtn) el.auditNcDeleteBtn.hidden = !record || auditNcModalPacMode;
   if (el.auditNcEmitBtn) el.auditNcEmitBtn.hidden = !record;
   if (el.auditNcPhotoUploadLabel) el.auditNcPhotoUploadLabel.hidden = !record;
   if (el.auditNcPhotoMessage) el.auditNcPhotoMessage.textContent = record ? "" : "Salve a não conformidade antes de adicionar fotos.";
   renderAuditNcPhotoGrid(record);
-  if (el.auditNcMessage) el.auditNcMessage.textContent = "";
+  if (el.auditNcMessage) {
+    el.auditNcMessage.textContent = auditNcModalPacMode
+      ? "Modo Plano de Ação: os dados de identificação da NC/OM ficam bloqueados. Você pode atualizar causa raiz, responsável, setor responsável, prazo, prorrogações, encerramento e observações."
+      : "";
+  }
   el.auditNcModal.hidden = false;
 }
 
@@ -2039,6 +2144,7 @@ el.auditNcForm?.addEventListener("submit", async (event) => {
     closeAuditNcModal();
     renderAuditOperacao();
     renderAuditoriaDashboard();
+    renderAuditPac();
   } catch (err) {
     if (el.auditNcMessage) el.auditNcMessage.textContent = "Não foi possível salvar. Tente novamente.";
     console.error(err);
@@ -2055,6 +2161,7 @@ el.auditNcDeleteBtn?.addEventListener("click", async () => {
     closeAuditNcModal();
     renderAuditOperacao();
     renderAuditoriaDashboard();
+    renderAuditPac();
   } catch (err) {
     console.error(err);
   }
@@ -2246,6 +2353,101 @@ async function openAuditoriaOperacaoTab() {
   await carregarAuditoriaNc();
   renderAuditOperacao();
 }
+
+// ===================== Plano de Ação (PAC) — visualização e atualização =====================
+// Reaproveita os mesmos dados e o mesmo modal de edição da aba "NC e OM", mas em uma página
+// separada, sem o botão de criar nova NC/OM e sem excluir: o cargo "Responsável pela PAC"
+// só acompanha e atualiza o plano de ação das não conformidades já registradas.
+
+async function openAuditoriaPacTab() {
+  await carregarAuditoriaNc();
+  renderAuditPac();
+}
+
+function filterAuditPacItems() {
+  const term = normalizeText(auditPacSearchTerm);
+  return auditNcData
+    .filter((item) => {
+      if (auditPacFilter !== "all" && item.status !== auditPacFilter) return false;
+      if (!term) return true;
+      const haystack = normalizeText(
+        `${item.ncNumber || ""} ${item.description || ""} ${item.ncDept || ""} ${item.ncSector || ""} ${item.pacResponsibleName || ""}`
+      );
+      return haystack.includes(term);
+    })
+    .sort((a, b) => String(b.ncDate || "").localeCompare(String(a.ncDate || "")));
+}
+
+function renderAuditPac() {
+  const errorEl = document.getElementById("audit_pac_error");
+  if (errorEl) {
+    if (auditNcLoadError) {
+      errorEl.textContent = auditNcLoadError;
+      errorEl.hidden = false;
+    } else {
+      errorEl.hidden = true;
+      errorEl.textContent = "";
+    }
+  }
+
+  const countEl = document.getElementById("audit_pac_count");
+  if (countEl) countEl.textContent = auditNcData.length;
+
+  const tbody = document.getElementById("audit_pac_table_body");
+  const emptyState = document.getElementById("audit_pac_empty_state");
+  if (!tbody) return;
+
+  const items = filterAuditPacItems();
+
+  if (!items.length) {
+    tbody.innerHTML = "";
+    if (emptyState) emptyState.hidden = false;
+    return;
+  }
+  if (emptyState) emptyState.hidden = true;
+
+  tbody.innerHTML = items
+    .map(
+      (item) => `
+    <tr data-audit-pac-id="${escapeHtml(item.id)}" class="audit-row">
+      <td>${escapeHtml(item.ncNumber || "-")}</td>
+      <td class="audit-td-desc">${escapeHtml(truncateText(item.description, 70))}</td>
+      <td>${escapeHtml(item.ncDept || item.ncSector || "-")}</td>
+      <td><span class="audit-status-pill ${auditStatusToneClass(item.status)}">${escapeHtml(item.status || "-")}</span></td>
+      <td>${formatAuditDate(item.deadline)}</td>
+      <td>${escapeHtml(item.pacResponsibleName || "-")}</td>
+      <td><button type="button" class="audit-row-emit-btn" data-pac-emit-id="${escapeHtml(item.id)}" title="Emitir FQ-071 com os dados desta NC">FQ-071</button></td>
+    </tr>
+  `
+    )
+    .join("");
+
+  tbody.querySelectorAll("[data-audit-pac-id]").forEach((row) => {
+    row.addEventListener("click", () => openAuditNcModal(row.dataset.auditPacId, { pacMode: true }));
+  });
+
+  tbody.querySelectorAll("[data-pac-emit-id]").forEach((btn) => {
+    btn.addEventListener("click", (event) => {
+      event.stopPropagation();
+      const record = auditNcData.find((item) => item.id === btn.dataset.pacEmitId);
+      emitFq071(record, btn);
+    });
+  });
+}
+
+document.getElementById("auditPacSearch")?.addEventListener("input", (event) => {
+  auditPacSearchTerm = event.target.value || "";
+  renderAuditPac();
+});
+
+document.querySelectorAll("[data-audit-pac-filter]").forEach((chip) => {
+  chip.addEventListener("click", () => {
+    document.querySelectorAll("[data-audit-pac-filter]").forEach((c) => c.classList.remove("active"));
+    chip.classList.add("active");
+    auditPacFilter = chip.dataset.auditPacFilter;
+    renderAuditPac();
+  });
+});
 
 // ===================== Criar Auditoria (checklists de setor -> NCs) =====================
 
@@ -6380,8 +6582,69 @@ function renderAdminUsers() {
     status.textContent = isOnline ? "online" : "registro";
 
     row.append(content, status);
+
+    const cargosBlock = document.createElement("div");
+    cargosBlock.className = "admin-user-cargos";
+
+    const isLegacyAllAccess = user.cargos === undefined;
+    const currentCargos = Array.isArray(user.cargos) ? user.cargos : [];
+
+    if (isLegacyAllAccess) {
+      const legacyNote = document.createElement("span");
+      legacyNote.className = "admin-user-cargos-legacy";
+      legacyNote.textContent = "Conta antiga: acesso total até um cargo ser marcado abaixo.";
+      cargosBlock.appendChild(legacyNote);
+    }
+
+    CARGO_LIST.forEach((cargo) => {
+      const optionId = `cargo_${user.id}_${cargo}`;
+      const wrap = document.createElement("label");
+      wrap.className = "uv-checkbox admin-user-cargo-option";
+      wrap.setAttribute("for", optionId);
+
+      const input = document.createElement("input");
+      input.type = "checkbox";
+      input.id = optionId;
+      input.checked = currentCargos.includes(cargo);
+      input.addEventListener("change", () => {
+        const next = new Set(currentCargos);
+        if (input.checked) next.add(cargo);
+        else next.delete(cargo);
+        updateUserCargos(user.id, [...next]);
+      });
+
+      const box = document.createElement("span");
+      box.className = "uv-checkbox-box";
+      box.innerHTML =
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 12 9 17 20 6"></polyline></svg>';
+
+      const labelText = document.createElement("span");
+      labelText.className = "uv-checkbox-label";
+      labelText.textContent = CARGO_LABELS[cargo];
+
+      wrap.append(input, box, labelText);
+      cargosBlock.appendChild(wrap);
+    });
+
+    row.appendChild(cargosBlock);
     el.adminUsersList.appendChild(row);
   });
+}
+
+async function updateUserCargos(uid, cargos) {
+  try {
+    await updateDoc(doc(db, "usuarios", uid), { cargos });
+    const idx = adminUsers.findIndex((item) => item.id === uid);
+    if (idx !== -1) adminUsers[idx] = { ...adminUsers[idx], cargos };
+    if (auth.currentUser?.uid === uid) {
+      currentUserCargos = cargos;
+      applyCargoVisibility();
+    }
+  } catch (err) {
+    console.error("Não foi possível atualizar os cargos deste usuário.", err);
+    alert(`Não foi possível salvar os cargos: "${err?.message || err}". Verifique as regras do Firestore.`);
+    renderAdminUsers();
+  }
 }
 
 function renderAdminSiteTree() {
@@ -8284,6 +8547,12 @@ window.showTab = function (tab) {
     return;
   }
 
+  // Trava de segurança: mesmo que algo tente abrir uma aba pelo nome (não só pelo clique
+  // no menu, que já fica escondido), o cargo do usuário é checado de novo aqui.
+  if (TAB_CARGO_MAP[tab] && currentUserCargos !== null && !userCanAccessTab(tab)) {
+    return;
+  }
+
   document.querySelectorAll(".tab").forEach((t) => t.classList.remove("active"));
   document.getElementById(tab)?.classList.add("active");
   document.querySelectorAll("[data-tab-target]").forEach((button) => {
@@ -8304,6 +8573,7 @@ window.showTab = function (tab) {
   if (tab === "auditoriaDashboard") openAuditoriaDashboardTab();
   if (tab === "auditoriaOperacao") openAuditoriaOperacaoTab();
   if (tab === "auditoriaCriar") openAuditoriaCriarTab();
+  if (tab === "auditoriaPac") openAuditoriaPacTab();
   if (tab === "publicacoes") {
     renderPublicationNetwork();
     startPublicationFloat();
