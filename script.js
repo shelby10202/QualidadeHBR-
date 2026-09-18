@@ -108,14 +108,16 @@ const FAA_SEARCH_TERMS = [
   "Airworthiness Directives Rolls-Royce 250",
   "Airworthiness Directives Rolls-Royce RR300"
 ];
-const EASA_SEARCH_TERMS = ["ec155", "as365", "as350", "ec130", "ec135", "bk117", "bell 407", "bell 429", "a109", "aw109", "aw139", "r66", "lycoming", "o-320", "o-360", "o-540", "io-540", "lts101", "pw206", "pw207", "pw210", "pt6b", "pt6c", "arriel", "arrius", "250-c18", "250-c30p", "250-c47", "rr300"];
-const EASA_SCAN_URLS = [
-  "https://ad.easa.europa.eu/search/advanced/result/page-1/",
-  "https://ad.easa.europa.eu/search/advanced/result/page-2/",
-  "https://ad.easa.europa.eu/search/advanced/result/page-3/",
-  "https://ad.easa.europa.eu/search/advanced/result/page-4/",
-  ...EASA_SEARCH_TERMS.map((term) => `https://ad.easa.europa.eu/search/${encodeURIComponent(term)}`)
-];
+// IMPORTANTE: "https://ad.easa.europa.eu/search/<termo>" NÃO filtra por palavra-chave - o
+// Safety Publications Tool (Drupal) ignora esse caminho e devolve a mesma listagem geral, então
+// as URLs por termo que existiam aqui antes nunca traziam nada específico do escopo HBR (eram
+// cópias repetidas da página 1). A varredura confiável é paginar a listagem geral (ordenada por
+// mais recente) e deixar o filtro de escopo (hasAdScopeTerm) decidir o que é relevante.
+const EASA_RESULT_PAGE_COUNT = 30;
+const EASA_SCAN_URLS = Array.from(
+  { length: EASA_RESULT_PAGE_COUNT },
+  (_, index) => `https://ad.easa.europa.eu/search/advanced/result/page-${index + 1}/`
+);
 const ANAC_SCAN_URLS = [
   "https://sistemas.anac.gov.br/certificacao/DA/DA_Last2.asp?St=N",
   "https://sistemas.anac.gov.br/certificacao/DA/DA_Last2.asp?St=E",
@@ -303,6 +305,19 @@ const AD_LINE_FILTERS = [
   }
 ];
 
+// Declarados aqui (e não perto de onde são usados, lá embaixo) porque initAdMonitor() já roda
+// mais acima no arquivo, no carregamento inicial do módulo - const/let só existem depois da
+// linha em que são declarados, então deixá-los perto do uso causava
+// "ReferenceError: Cannot access ... before initialization" logo ao abrir a página.
+const AD_AUTHORITY_KEYS = ["ANAC", "FAA", "EASA"];
+const AD_LINE_CHART_COLORS = {
+  AIRBUS: "#38bdf8",
+  BELL: "#f97316",
+  LEONARDO: "#a78bfa",
+  ROBINSON: "#22c55e"
+};
+const AD_AUTHORITY_CHART_COLORS = { ANAC: "#38bdf8", FAA: "#f59e0b", EASA: "#22c55e" };
+
 const DEFAULT_AD_FINDINGS = [
   {
     id: "easa-26-105",
@@ -437,7 +452,6 @@ const DOCUMENT_IMPORT_FIELDS = [
   { key: "nomeDocumento", label: "Nome do documento", aliases: ["nome do documento", "nome documento", "titulo", "título", "descricao", "descrição", "document title"] },
   { key: "setor", label: "Setor", aliases: ["setor", "area", "área", "setor responsavel", "setor responsável"] },
   { key: "setorAdjacente", label: "Setor adjacente", aliases: ["setor adjacente", "adjacente", "setor impactado", "impacto", "relacao", "relação"] },
-  { key: "documentosRelacionados", label: "Documentos relacionados (código)", aliases: ["documentos relacionados", "documento relacionado", "codigo relacionado", "código relacionado", "codigos relacionados", "códigos relacionados", "referencia", "referência", "referencias", "referências", "documentos vinculados", "vinculado a", "relacionado a", "codigos vinculados"] },
   { key: "desenvolvidoPor", label: "Desenvolvido por", aliases: ["desenvolvido por", "desenvolvedor", "elaborado por", "autor", "responsavel", "responsável"] },
   { key: "revisoes", label: "Revisões", aliases: ["revisoes", "revisões", "revisao", "revisão", "rev", "versao", "versão"] }
 ];
@@ -469,34 +483,12 @@ const DEFAULT_PUBLICATION_NETWORK = {
 
 const DEFAULT_PUBLICATION_CONFIG = {
   intensity: 82,
-  nodeSize: 32,
+  nodeSize: 62,
   lineWidth: 3,
   showLabels: true,
-  // Todas as conexões aparecem por padrão. Em redes muito grandes isso pode
-  // ficar denso; o zoom/pan do quadro ajuda a navegar nesse caso, e quem
-  // preferir pode ligar "Só conexões selecionadas" no painel Tela.
-  focusLinksOnSelection: false,
   filters: { FQ: true, IT: true, PRQ: true },
   search: ""
 };
-
-// Área útil (em % de posição, dentro do canvas) onde os nós podem se mover.
-// Antes o retângulo era 90x84 e assimétrico (x:5-95, y:8-92), o que empurrava
-// os nós para faixas finas perto das bordas de cima/baixo com muitos
-// documentos. Um quadro maior e simétrico dá mais espaço para espalhar.
-const PUBLICATION_FIELD_MIN = 3;
-const PUBLICATION_FIELD_MAX = 97;
-// O retângulo de exibição é levemente maior que o de física/arraste, para
-// permitir um pequeno "respiro" visual nas bordas.
-const PUBLICATION_DISPLAY_MIN = 2;
-const PUBLICATION_DISPLAY_MAX = 98;
-// Limite de segurança para quantos links são desenhados/calculados por vez.
-// Uma rede importada antes de existir limite por documento (ou qualquer outro
-// jeito de acabar com um grafo quase completo) pode ter dezenas ou centenas
-// de milhares de links salvos; tentar desenhar tudo isso de uma vez trava a
-// aba. Precisa ficar aqui em cima: initPublicationNetwork() roda assim que a
-// página carrega e já usa esse valor antes de chegar no resto do arquivo.
-const PUBLICATION_MAX_RENDERED_LINKS = 4000;
 
 prepareStaticShells();
 
@@ -636,8 +628,9 @@ const el = {
   adNotificationTotal: document.getElementById("adNotificationTotal"),
   adNotificationMandatory: document.getElementById("adNotificationMandatory"),
   adNotificationProposal: document.getElementById("adNotificationProposal"),
+  adNotificationCritical: document.getElementById("adNotificationCritical"),
+  adNotificationLinesActive: document.getElementById("adNotificationLinesActive"),
   adNotificationLineFilter: document.getElementById("adNotificationLineFilter"),
-  adNotificationDateSort: document.getElementById("adNotificationDateSort"),
   adNotificationsList: document.getElementById("adNotificationsList"),
   adDetailModal: document.getElementById("adDetailModal"),
   adDetailCloseBtn: document.getElementById("adDetailCloseBtn"),
@@ -652,16 +645,11 @@ const el = {
   publicationNetworkTitle: document.getElementById("publicationNetworkTitle"),
   publicationShell: document.getElementById("publicationShell"),
   publicationCanvas: document.getElementById("publicationCanvas"),
-  publicationZoomLayer: document.getElementById("publicationZoomLayer"),
   publicationLinks: document.getElementById("publicationLinks"),
   publicationNodes: document.getElementById("publicationNodes"),
   publicationMenuBtn: document.getElementById("publicationMenuBtn"),
   publicationInfoPanel: document.getElementById("publicationInfoPanel"),
   publicationResetViewBtn: document.getElementById("publicationResetViewBtn"),
-  publicationZoomInBtn: document.getElementById("publicationZoomInBtn"),
-  publicationZoomOutBtn: document.getElementById("publicationZoomOutBtn"),
-  publicationZoomResetBtn: document.getElementById("publicationZoomResetBtn"),
-  publicationZoomLevel: document.getElementById("publicationZoomLevel"),
   publicationSearch: document.getElementById("publicationSearch"),
   publicationFilterFq: document.getElementById("publicationFilterFq"),
   publicationFilterIt: document.getElementById("publicationFilterIt"),
@@ -680,7 +668,6 @@ const el = {
   publicationNodeSize: document.getElementById("publicationNodeSize"),
   publicationLineWidth: document.getElementById("publicationLineWidth"),
   publicationLabelsToggle: document.getElementById("publicationLabelsToggle"),
-  publicationFocusLinksToggle: document.getElementById("publicationFocusLinksToggle"),
   publicationAnimateBtn: document.getElementById("publicationAnimateBtn"),
   workspace: document.querySelector(".workspace")
 };
@@ -689,6 +676,8 @@ let data = [];
 let historicoGlobal = [];
 let chart;
 let chartPizza;
+let adNotificationLineChart;
+let adNotificationAuthorityChart;
 let activeAircraftFilter = "all";
 let editingItemId = null;
 let activeModalItems = [];
@@ -705,17 +694,6 @@ let publicationFloatFrame = null;
 let publicationFloatLastTime = 0;
 let publicationDraggedNodeId = null;
 let publicationPhysicsNodes = new Map();
-// Elementos <line> já anexados ao SVG, indexados por link, reaproveitados a cada
-// frame de animação (evita recriar centenas/milhares de elementos 60x por segundo).
-let publicationLinkElements = new Map();
-// Zoom/pan do quadro da rede: puramente visual (transform em cima do
-// #publicationZoomLayer), não muda as coordenadas lógicas dos nós.
-const PUBLICATION_ZOOM_MIN = 0.4;
-const PUBLICATION_ZOOM_MAX = 4;
-let publicationZoomScale = 1;
-let publicationZoomX = 0;
-let publicationZoomY = 0;
-let publicationPanState = null;
 let documentImportState = createEmptyDocumentImportState();
 let adMonitorState = loadStoredAdMonitorState();
 let adReports = loadStoredAdReports();
@@ -1061,8 +1039,7 @@ el.adRefreshBtn?.addEventListener("click", () => runAdSearch({ automatic: false 
 el.adSearchFilter?.addEventListener("input", renderAdResults);
 el.adLineFilter?.addEventListener("change", renderAdResults);
 el.adDateSort?.addEventListener("change", renderAdResults);
-el.adNotificationLineFilter?.addEventListener("change", renderAdNotifications);
-el.adNotificationDateSort?.addEventListener("change", renderAdNotifications);
+el.adNotificationLineFilter?.addEventListener("change", renderAdMiniAlertList);
 el.adDailyReportBtn?.addEventListener("click", () => {
   createAdReport("daily", true);
   renderAdMonitor();
@@ -1082,25 +1059,11 @@ el.publicationDeleteSelectedBtn?.addEventListener("click", deleteSelectedPublica
 el.publicationResetViewBtn?.addEventListener("click", resetPublicationLayout);
 el.publicationMenuBtn?.addEventListener("click", togglePublicationMenu);
 el.publicationAnimateBtn?.addEventListener("click", animatePublicationNetwork);
-el.publicationZoomInBtn?.addEventListener("click", () => {
-  const center = getPublicationCanvasCenter();
-  setPublicationZoom(publicationZoomScale * 1.3, center.x, center.y, true);
-});
-el.publicationZoomOutBtn?.addEventListener("click", () => {
-  const center = getPublicationCanvasCenter();
-  setPublicationZoom(publicationZoomScale / 1.3, center.x, center.y, true);
-});
-el.publicationZoomResetBtn?.addEventListener("click", resetPublicationZoom);
-el.publicationCanvas?.addEventListener("wheel", handlePublicationWheelZoom, { passive: false });
-el.publicationCanvas?.addEventListener("pointerdown", handlePublicationPanStart);
-el.publicationCanvas?.addEventListener("pointermove", handlePublicationPanMove);
-el.publicationCanvas?.addEventListener("pointerup", handlePublicationPanEnd);
-el.publicationCanvas?.addEventListener("pointercancel", handlePublicationPanEnd);
 el.publicationSearch?.addEventListener("input", handlePublicationConfigChange);
 [el.publicationFilterFq, el.publicationFilterIt, el.publicationFilterPrq]
   .filter(Boolean)
   .forEach((input) => input.addEventListener("change", handlePublicationConfigChange));
-[el.publicationIntensity, el.publicationNodeSize, el.publicationLineWidth, el.publicationLabelsToggle, el.publicationFocusLinksToggle]
+[el.publicationIntensity, el.publicationNodeSize, el.publicationLineWidth, el.publicationLabelsToggle]
   .filter(Boolean)
   .forEach((input) => input.addEventListener("input", handlePublicationConfigChange));
 el.filterChips.forEach((chip) => {
@@ -1496,7 +1459,7 @@ function createPublicationNodesFromDocumentRows(documents) {
     const title = cleanTextLine(record.nomeDocumento || code);
     const type = inferPublicationType(record.documento, code);
     const angle = (index / total) * Math.PI * 2;
-    const radius = documents.length > 8 ? 38 : 32;
+    const radius = documents.length > 8 ? 35 : 29;
     const id = uniqueDocumentImportId(slugifyAreaName(`${type}-${code}`), usedIds);
 
     return {
@@ -1507,24 +1470,15 @@ function createPublicationNodesFromDocumentRows(documents) {
       documento: cleanTextLine(record.documento || type),
       sector: cleanTextLine(record.setor || "Publicações"),
       adjacentSector: cleanTextLine(record.setorAdjacente || ""),
-      relatedCodes: cleanTextLine(record.documentosRelacionados || ""),
       developedBy: cleanTextLine(record.desenvolvidoPor || ""),
       revisions: cleanTextLine(record.revisoes || ""),
       sourceFile: documentImportState.fileName,
       sourceSheet: documentImportState.sheetName,
       sourceRow: record.rowNumber,
-      x: clampNumber(50 + Math.cos(angle) * radius, PUBLICATION_FIELD_MIN, PUBLICATION_FIELD_MAX),
-      y: clampNumber(52 + Math.sin(angle) * radius, PUBLICATION_FIELD_MIN, PUBLICATION_FIELD_MAX)
+      x: clampNumber(50 + Math.cos(angle) * radius, 8, 92),
+      y: clampNumber(52 + Math.sin(angle) * radius, 10, 90)
     };
   });
-}
-
-// Suporta redes grandes (milhares de documentos): indexa por código/setor em
-// vez de comparar cada nó com todos os outros (O(n) em vez de O(n²)).
-const PUBLICATION_LINKS_MAX_PER_NODE = 20;
-
-function normalizeDocumentCode(value) {
-  return normalizeText(value).replace(/[^A-Z0-9]/g, "");
 }
 
 function createPublicationLinksFromDocumentRows(nodes) {
@@ -1539,47 +1493,30 @@ function createPublicationLinksFromDocumentRows(nodes) {
     links.push({ from, to });
   };
 
-  // Conexão principal: cada documento se liga aos códigos que ele mesmo lista
-  // na coluna "Documentos relacionados" (mapeada no import). Isso reflete a
-  // relação real entre documentos em vez de agrupar tudo que está no mesmo
-  // setor, o que gerava uma rede muito mais densa (e confusa) do que o real.
-  const codeToNode = new Map();
-  nodes.forEach((node) => {
-    const key = normalizeDocumentCode(node.code);
-    if (key && !codeToNode.has(key)) codeToNode.set(key, node);
-  });
+  nodes.forEach((source) => {
+    const sourceAdjacent = splitDocumentImportList(source.adjacentSector).map(normalizeSpreadsheetFieldName);
+    const sourceSector = normalizeSpreadsheetFieldName(source.sector);
 
-  nodes.forEach((node) => {
-    const relatedCodes = splitDocumentImportList(node.relatedCodes).map(normalizeDocumentCode).filter(Boolean);
-    relatedCodes.forEach((codeKey) => {
-      const target = codeToNode.get(codeKey);
-      if (target) addLink(node.id, target.id);
-    });
-  });
+    nodes.forEach((target) => {
+      if (source.id === target.id) return;
 
-  if (links.length) return links;
+      const targetSector = normalizeSpreadsheetFieldName(target.sector);
+      const targetAdjacent = splitDocumentImportList(target.adjacentSector).map(normalizeSpreadsheetFieldName);
 
-  // Sem coluna de códigos relacionados preenchida: cai para o agrupamento por
-  // setor/setor adjacente, como antes.
-  const bySector = new Map();
-  nodes.forEach((node) => {
-    const key = normalizeSpreadsheetFieldName(node.sector || "Publicações");
-    if (!bySector.has(key)) bySector.set(key, []);
-    bySector.get(key).push(node);
-  });
-
-  nodes.forEach((node) => {
-    const adjacentSectors = splitDocumentImportList(node.adjacentSector).map(normalizeSpreadsheetFieldName);
-    adjacentSectors.forEach((sectorKey) => {
-      const targets = bySector.get(sectorKey);
-      if (!targets) return;
-      // Limita conexões por nó: um documento não precisa (nem é útil visualmente)
-      // linkar com centenas de outros do mesmo setor.
-      targets.slice(0, PUBLICATION_LINKS_MAX_PER_NODE).forEach((target) => addLink(node.id, target.id));
+      if (sourceAdjacent.includes(targetSector) || targetAdjacent.includes(sourceSector)) {
+        addLink(source.id, target.id);
+      }
     });
   });
 
   if (!links.length) {
+    const bySector = nodes.reduce((map, node) => {
+      const key = normalizeSpreadsheetFieldName(node.sector || "Publicações");
+      if (!map.has(key)) map.set(key, []);
+      map.get(key).push(node);
+      return map;
+    }, new Map());
+
     bySector.forEach((group) => {
       group.slice(1).forEach((node) => addLink(group[0].id, node.id));
     });
@@ -1728,11 +1665,26 @@ async function runAdSearch({ automatic = false } = {}) {
   }
 }
 
+// Preencha com a URL do endpoint AWS (saída "ApiEndpoint" do "sam deploy") quando o
+// backend de pesquisa de ADs for migrado para AWS Lambda. Enquanto estiver vazia, o
+// site continua usando a Cloud Function do Firebase em "/api/run-ad-search" (ou o
+// fallback de leitura pelo navegador, se nenhum dos dois responder).
+const AWS_AD_SEARCH_ENDPOINT = "";
+
 async function runAdBackendSearch() {
   if (!["http:", "https:"].includes(window.location.protocol)) return null;
 
+  if (AWS_AD_SEARCH_ENDPOINT) {
+    const awsResult = await callAdSearchEndpoint(AWS_AD_SEARCH_ENDPOINT);
+    if (awsResult) return awsResult;
+  }
+
+  return callAdSearchEndpoint("/api/run-ad-search");
+}
+
+async function callAdSearchEndpoint(url) {
   try {
-    const response = await fetch("/api/run-ad-search", {
+    const response = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ source: "site" })
@@ -1865,7 +1817,7 @@ async function searchFederalRegisterFromBrowser(term) {
   const documentTypes = ["RULE", "PRORULE"];
   const attempts = await Promise.all(documentTypes.map((type) => {
     const params = new URLSearchParams();
-    params.set("per_page", "20");
+    params.set("per_page", "100");
     params.set("order", "newest");
     params.set("conditions[term]", term);
     params.append("conditions[agencies][]", "federal-aviation-administration");
@@ -1948,7 +1900,103 @@ function createFaaAdFinding(document) {
   });
 }
 
+// Mesma extração baseada em tabela real (<table>/<tr>/<td>) usada no backend: mais confiável
+// que cortar a página inteira em linhas de texto e adivinhar onde cada registro começa, e evita
+// que o número da DA da ANAC (que tem formato de data) seja confundido com uma data real.
+// Ver o comentário equivalente em functions/index.js para o raciocínio completo.
+function extractAdTableRows(html) {
+  const rows = [];
+  const trRegex = /<tr\b[\s\S]*?<\/tr>/gi;
+  const cellRegex = /<t[dh][^>]*>([\s\S]*?)<\/t[dh]>/gi;
+  let trMatch;
+  while ((trMatch = trRegex.exec(html))) {
+    const cells = [];
+    let cellMatch;
+    cellRegex.lastIndex = 0;
+    while ((cellMatch = cellRegex.exec(trMatch[0]))) {
+      const cellText = cleanTextLine(stripAdHtml(cellMatch[1]));
+      if (cellText) cells.push(cellText);
+    }
+    if (cells.length) rows.push(cells);
+  }
+  return rows;
+}
+
+function createAdFindingFromRow(authority, cells, pageUrl) {
+  const numberIdx = cells.findIndex((cell) => isAdDocumentNumberLine(cell));
+  if (numberIdx === -1) return null;
+  const number = getAdDocumentNumber(cells[numberIdx]);
+  if (!number) return null;
+
+  const fullRowText = cells.join(" | ");
+  if (!hasAdScopeTerm(fullRowText)) return null;
+
+  const otherCells = cells.filter((_, idx) => idx !== numberIdx);
+  const rowDates = otherCells.flatMap((cell) => getAdDates(cell));
+  const isLabelCell = (cell) => /^(AD|PAD|SIB|SD|EAD|DA|EU|US|BR|EASA|FAA|ANAC)$/i.test(cell);
+  const subject = cleanTextLine(
+    otherCells
+      .filter((cell) => cell.length > 3 && !isLabelCell(cell) && !getAdDates(cell).length)
+      .sort((a, b) => b.length - a.length)[0] || ""
+  );
+
+  if (authority === "EASA") {
+    const type = cells.some((cell) => /^PAD$/i.test(cell)) || /^\d{2}-\d{3}$/.test(number)
+      ? "PAD"
+      : cells.some((cell) => /^SIB$/i.test(cell))
+        ? "SIB"
+        : cells.some((cell) => /^SD$/i.test(cell))
+          ? "SD"
+          : "AD";
+    const finalSubject = subject || "Safety Publication";
+
+    return normalizeAdFinding({
+      id: `easa-${normalizeAdKey(number)}`,
+      authority: "EASA",
+      number,
+      type,
+      issueDate: rowDates[0] || "",
+      effectiveDate: rowDates[1] || "",
+      holder: inferAdHolder(fullRowText),
+      model: inferAdModel(fullRowText),
+      subject: finalSubject,
+      match: buildAdScopeMatch(fullRowText),
+      status: type === "PAD" ? "Novo para análise" : "Aplicável ao escopo",
+      sourceUrl: `https://ad.easa.europa.eu/ad/${encodeURIComponent(number)}`,
+      identified: `Publicação EASA relacionada a ${finalSubject}.`,
+      treatment: type === "PAD"
+        ? "Acompanhar consulta da proposta e preparar avaliação de impacto para Publicações e Qualidade."
+        : "Verificar efetividade, aplicabilidade por modelo e ação mandatória antes de liberar tratativa interna."
+    });
+  }
+
+  const finalSubject = subject || "Diretriz de Aeronavegabilidade";
+
+  return normalizeAdFinding({
+    id: `anac-${normalizeAdKey(number)}`,
+    authority: "ANAC",
+    number,
+    type: "DA",
+    issueDate: rowDates[0] || "",
+    effectiveDate: rowDates[1] || "",
+    holder: inferAdHolder(fullRowText),
+    model: inferAdModel(fullRowText),
+    subject: finalSubject,
+    match: buildAdScopeMatch(fullRowText),
+    status: "Aplicável ao escopo",
+    sourceUrl: pageUrl,
+    identified: `DA brasileira com termo compatível com o escopo da EO HBR: ${finalSubject}.`,
+    treatment: "Validar aplicabilidade e registrar cumprimento conforme texto oficial da ANAC."
+  });
+}
+
 function extractEasaAdFindings(html, pageUrl) {
+  const rows = extractAdTableRows(html).filter((cells) => cells.some((cell) => isAdDocumentNumberLine(cell)));
+  if (rows.length) {
+    return rows.map((cells) => createAdFindingFromRow("EASA", cells, pageUrl)).filter(Boolean);
+  }
+
+  // Reserva: se a página não tiver uma <table> reconhecível, volta para a heurística antiga.
   return splitAdPublicationBlocks(stripAdHtml(html))
     .map((block) => createEasaAdFinding(block, pageUrl))
     .filter(Boolean);
@@ -1983,9 +2031,15 @@ function createEasaAdFinding(block) {
 }
 
 function extractAnacAdFindings(html, pageUrl) {
-  const text = stripAdHtml(html);
-  if (normalizeText(text).includes("NAO EXISTE DA")) return [];
-  return splitAdPublicationBlocks(text)
+  if (normalizeText(stripAdHtml(html)).includes("NAO EXISTE DA")) return [];
+
+  const rows = extractAdTableRows(html).filter((cells) => cells.some((cell) => isAdDocumentNumberLine(cell)));
+  if (rows.length) {
+    return rows.map((cells) => createAdFindingFromRow("ANAC", cells, pageUrl)).filter(Boolean);
+  }
+
+  // Reserva: se a página não tiver uma <table> reconhecível, volta para a heurística antiga.
+  return splitAdPublicationBlocks(stripAdHtml(html))
     .map((block) => createAnacAdFinding(block, pageUrl))
     .filter(Boolean);
 }
@@ -2368,20 +2422,101 @@ function renderAdResults() {
   });
 }
 
+// Dashboard de notificações: KPIs + gráficos ficam aqui (dados agregados, ignoram o filtro da
+// mini lista); a mini lista (renderAdMiniAlertList) é quem aplica o filtro simples por linha.
 function renderAdNotifications() {
   if (!el.adNotificationsList) return;
-  el.adNotificationsList.textContent = "";
 
   const findings = adMonitorState.findings || [];
   const mandatoryCount = findings.filter((finding) => !isProposedAdType(finding.type)).length;
   const proposalCount = findings.length - mandatoryCount;
+  const criticalCount = findings.filter((finding) => getAdNotificationPriority(finding).tone === "critical").length;
+
+  const lineDistribution = AD_LINE_FILTERS.map((line) => ({
+    key: line.key,
+    label: line.label,
+    count: findings.filter((finding) => getAdLineMatches(finding).some((match) => match.key === line.key)).length
+  }));
+  const activeLinesCount = lineDistribution.filter((line) => line.count > 0).length;
+
+  const authorityDistribution = AD_AUTHORITY_KEYS.map((authority) => ({
+    key: authority,
+    count: findings.filter((finding) => String(finding.authority || "").toUpperCase() === authority).length
+  }));
+
   if (el.adNotificationTotal) el.adNotificationTotal.textContent = String(findings.length);
   if (el.adNotificationMandatory) el.adNotificationMandatory.textContent = String(mandatoryCount);
   if (el.adNotificationProposal) el.adNotificationProposal.textContent = String(proposalCount);
+  if (el.adNotificationCritical) el.adNotificationCritical.textContent = String(criticalCount);
+  if (el.adNotificationLinesActive) el.adNotificationLinesActive.textContent = String(activeLinesCount);
+
+  renderAdNotificationCharts(lineDistribution, authorityDistribution);
+  renderAdMiniAlertList();
+}
+
+// Mesmos gráficos de barra/rosca do Dashboard principal (gerarGrafico), mesma paleta e mesmas
+// opções de eixo/legenda - só muda o dado, para não sair do padrão visual já usado no site.
+function renderAdNotificationCharts(lineDistribution, authorityDistribution) {
+  if (typeof Chart === "undefined") return;
+  if (adNotificationLineChart) adNotificationLineChart.destroy();
+  if (adNotificationAuthorityChart) adNotificationAuthorityChart.destroy();
+
+  const lineCanvas = document.getElementById("adNotificationLineChart");
+  if (lineCanvas) {
+    adNotificationLineChart = new Chart(lineCanvas, {
+      type: "bar",
+      data: {
+        labels: lineDistribution.map((line) => line.label),
+        datasets: [{
+          label: "Alertas",
+          data: lineDistribution.map((line) => line.count),
+          backgroundColor: lineDistribution.map((line) => AD_LINE_CHART_COLORS[line.key] || "#94a3b8"),
+          borderRadius: 4
+        }]
+      },
+      options: {
+        maintainAspectRatio: false,
+        resizeDelay: 120,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { ticks: { color: "#a1a1aa" }, grid: { display: false } },
+          y: { beginAtZero: true, ticks: { color: "#a1a1aa", precision: 0 }, grid: { color: "rgba(255, 255, 255, 0.06)" } }
+        }
+      }
+    });
+  }
+
+  const authorityCanvas = document.getElementById("adNotificationAuthorityChart");
+  if (authorityCanvas) {
+    adNotificationAuthorityChart = new Chart(authorityCanvas, {
+      type: "doughnut",
+      data: {
+        labels: authorityDistribution.map((item) => item.key),
+        datasets: [{
+          data: authorityDistribution.map((item) => item.count),
+          backgroundColor: authorityDistribution.map((item) => AD_AUTHORITY_CHART_COLORS[item.key] || "#94a3b8"),
+          borderWidth: 0
+        }]
+      },
+      options: {
+        cutout: "68%",
+        maintainAspectRatio: false,
+        resizeDelay: 120,
+        plugins: { legend: { position: "bottom", labels: { color: "#e5e7eb" } } }
+      }
+    });
+  }
+}
+
+// Mini lista de alertas: versão compacta do card de notificação, com um único filtro simples
+// (linha da EO HBR). Limitada aos 20 mais recentes para continuar "mini" - a lista completa
+// já existe na aba Pesquisa de ADs.
+function renderAdMiniAlertList() {
+  if (!el.adNotificationsList) return;
+  el.adNotificationsList.textContent = "";
 
   const line = el.adNotificationLineFilter?.value || "all";
-  const sort = el.adNotificationDateSort?.value || "newest";
-  const filtered = filterAndSortAdFindings({ search: "", line, sort });
+  const filtered = filterAndSortAdFindings({ search: "", line, sort: "newest" });
 
   if (!filtered.length) {
     const empty = document.createElement("div");
@@ -2391,11 +2526,11 @@ function renderAdNotifications() {
     return;
   }
 
-  filtered.forEach((finding) => {
+  const visible = filtered.slice(0, 20);
+  visible.forEach((finding) => {
     const priority = getAdNotificationPriority(finding);
-    const lineMatches = getAdLineMatches(finding);
     const card = document.createElement("article");
-    card.className = `ad-notification-card ${priority.tone}`;
+    card.className = `ad-notification-card mini ${priority.tone}`;
     card.innerHTML = `
       <div class="ad-notification-main">
         <div class="ad-result-meta">
@@ -2404,15 +2539,19 @@ function renderAdNotifications() {
           <span>${escapeHtml(formatAdDate(finding.issueDate))}</span>
         </div>
         <strong>${escapeHtml(finding.number)} | ${escapeHtml(finding.subject || "Diretriz de Aeronavegabilidade")}</strong>
-        <div class="ad-line-chip-list">${createAdLineChipsHtml(lineMatches)}</div>
-        <p>${escapeHtml(priority.message)}</p>
-        <p>Motores da linha: ${escapeHtml(formatAdList(getAdFindingEngineScope(finding), "Motor não identificado no texto da AD."))}</p>
       </div>
       <button type="button" class="modal-action secondary" data-ad-notification-report="${escapeHtml(finding.id)}">Ver relatório</button>
     `;
     card.querySelector("[data-ad-notification-report]")?.addEventListener("click", () => openAdDetail(finding.id));
     el.adNotificationsList.appendChild(card);
   });
+
+  if (filtered.length > visible.length) {
+    const note = document.createElement("p");
+    note.className = "ad-mini-list-note";
+    note.textContent = `Mostrando os ${visible.length} mais recentes de ${filtered.length}. Veja a lista completa em "Pesquisa de ADs".`;
+    el.adNotificationsList.appendChild(note);
+  }
 }
 
 function filterAndSortAdFindings({ search = "", line = "all", sort = "newest" } = {}) {
@@ -2556,6 +2695,7 @@ function openAdDetail(findingId) {
           <span>Tratativas</span>
           <p>${escapeHtml(report.treatment)}</p>
         </section>
+        ${buildAdAiAnalysisHtml(finding)}
       </div>
       <p class="ad-detail-note">${escapeHtml(finding.match || "Correspondência com o escopo da EO HBR.")}</p>
     `;
@@ -2572,6 +2712,43 @@ function openAdDetail(findingId) {
   }
 
   el.adDetailModal.hidden = false;
+}
+
+// Mostra a análise da IA (gerada no backend - ver aws-lambda/README.md) quando o achado
+// já tiver esse campo. Enquanto o backend de IA não estiver ligado, finding.aiAnalysis
+// não existe e essa seção simplesmente não aparece - não quebra nada no site atual.
+const AD_AI_URGENCY_LABELS = { baixa: "Baixa", media: "Média", alta: "Alta", critica: "Crítica" };
+const AD_AI_URGENCY_TONE = { baixa: "ok", media: "warning", alta: "warning", critica: "critical" };
+
+function buildAdAiAnalysisHtml(finding) {
+  const analysis = finding.aiAnalysis;
+  if (!analysis) return "";
+
+  if (analysis.error) {
+    return `
+      <section class="ad-detail-grid-full ad-ai-analysis">
+        <span>Análise de IA</span>
+        <p>Não foi possível gerar a análise automática desta AD (${escapeHtml(analysis.error)}). O restante do relatório acima segue confiável, é só a camada de IA que falhou nesta execução.</p>
+      </section>
+    `;
+  }
+
+  const urgencyLabel = AD_AI_URGENCY_LABELS[analysis.urgency] || "Não avaliada";
+  const urgencyTone = AD_AI_URGENCY_TONE[analysis.urgency] || "warning";
+  const applicableLabel = analysis.applicable === true ? "Aplicável à frota HBR" : analysis.applicable === false ? "Não aplicável à frota HBR" : "Aplicabilidade não avaliada";
+
+  return `
+    <section class="ad-detail-grid-full ad-ai-analysis">
+      <span>Análise de IA</span>
+      <div class="ad-detail-summary">
+        <b class="ad-status-pill ${urgencyTone}">Urgência: ${escapeHtml(urgencyLabel)}</b>
+        <b class="ad-status-pill ${analysis.applicable === false ? "empty" : "ok"}">${escapeHtml(applicableLabel)}</b>
+      </div>
+      ${analysis.summary ? `<p>${escapeHtml(analysis.summary)}</p>` : ""}
+      ${analysis.recommendedAction ? `<p><strong>Ação recomendada:</strong> ${escapeHtml(analysis.recommendedAction)}</p>` : ""}
+      ${analysis.reasoning ? `<p class="ad-detail-note">${escapeHtml(analysis.reasoning)}</p>` : ""}
+    </section>
+  `;
 }
 
 function closeAdDetail() {
@@ -2875,7 +3052,6 @@ function clampInteger(value, min, max) {
 
 function initPublicationNetwork() {
   syncPublicationPhysicsState();
-  applyPublicationZoomTransform();
   // A rede fica em localStorage para permitir ajustes rápidos sem alterar o código.
   syncPublicationControls();
   renderPublicationNetwork();
@@ -2888,89 +3064,6 @@ function togglePublicationMenu() {
   el.publicationMenuBtn?.setAttribute("aria-expanded", String(isOpen));
 }
 
-// Zoom/pan do quadro da rede. É só uma transformação visual (CSS transform)
-// em cima do #publicationZoomLayer: os nós continuam posicionados por
-// porcentagem do tamanho original do canvas, então nada na física ou no
-// cálculo de posição precisa saber que existe zoom.
-function applyPublicationZoomTransform() {
-  if (!el.publicationZoomLayer) return;
-  el.publicationZoomLayer.style.transform =
-    `translate(${publicationZoomX}px, ${publicationZoomY}px) scale(${publicationZoomScale})`;
-  if (el.publicationZoomLevel) {
-    el.publicationZoomLevel.textContent = `${Math.round(publicationZoomScale * 100)}%`;
-  }
-}
-
-// Ajusta o zoom mantendo o ponto (anchorX, anchorY, em pixels relativos ao
-// canvas) fixo na tela, para o zoom "puxar" na direção do cursor/centro em
-// vez de sempre re-centralizar no canto superior esquerdo.
-function setPublicationZoom(nextScale, anchorX, anchorY, animated) {
-  const clamped = clampNumber(nextScale, PUBLICATION_ZOOM_MIN, PUBLICATION_ZOOM_MAX);
-  if (clamped === publicationZoomScale) return;
-
-  const contentX = (anchorX - publicationZoomX) / publicationZoomScale;
-  const contentY = (anchorY - publicationZoomY) / publicationZoomScale;
-  publicationZoomX = anchorX - contentX * clamped;
-  publicationZoomY = anchorY - contentY * clamped;
-  publicationZoomScale = clamped;
-
-  el.publicationZoomLayer?.classList.toggle("is-animated-zoom", Boolean(animated));
-  applyPublicationZoomTransform();
-}
-
-function getPublicationCanvasCenter() {
-  const rect = el.publicationCanvas?.getBoundingClientRect();
-  if (!rect) return { x: 0, y: 0 };
-  return { x: rect.width / 2, y: rect.height / 2 };
-}
-
-function resetPublicationZoom() {
-  publicationZoomScale = 1;
-  publicationZoomX = 0;
-  publicationZoomY = 0;
-  el.publicationZoomLayer?.classList.add("is-animated-zoom");
-  applyPublicationZoomTransform();
-}
-
-function handlePublicationWheelZoom(event) {
-  if (!el.publicationCanvas) return;
-  event.preventDefault();
-  const rect = el.publicationCanvas.getBoundingClientRect();
-  const anchorX = event.clientX - rect.left;
-  const anchorY = event.clientY - rect.top;
-  const zoomFactor = Math.exp(-event.deltaY * 0.0015);
-  setPublicationZoom(publicationZoomScale * zoomFactor, anchorX, anchorY, false);
-}
-
-function handlePublicationPanStart(event) {
-  if (!el.publicationCanvas) return;
-  // Não inicia o pan se o gesto começou em cima de um nó (que tem seu
-  // próprio arraste) ou de um controle da barra superior.
-  if (event.target.closest(".publication-node")) return;
-  publicationPanState = {
-    pointerId: event.pointerId,
-    startClientX: event.clientX,
-    startClientY: event.clientY,
-    startX: publicationZoomX,
-    startY: publicationZoomY
-  };
-  el.publicationCanvas.classList.add("is-panning");
-  el.publicationCanvas.setPointerCapture?.(event.pointerId);
-}
-
-function handlePublicationPanMove(event) {
-  if (!publicationPanState || event.pointerId !== publicationPanState.pointerId) return;
-  publicationZoomX = publicationPanState.startX + (event.clientX - publicationPanState.startClientX);
-  publicationZoomY = publicationPanState.startY + (event.clientY - publicationPanState.startClientY);
-  applyPublicationZoomTransform();
-}
-
-function handlePublicationPanEnd(event) {
-  if (!publicationPanState || event.pointerId !== publicationPanState.pointerId) return;
-  publicationPanState = null;
-  el.publicationCanvas?.classList.remove("is-panning");
-}
-
 function syncPublicationControls() {
   if (el.publicationSearch) el.publicationSearch.value = publicationConfig.search;
   if (el.publicationFilterFq) el.publicationFilterFq.checked = Boolean(publicationConfig.filters.FQ);
@@ -2980,7 +3073,6 @@ function syncPublicationControls() {
   if (el.publicationNodeSize) el.publicationNodeSize.value = String(publicationConfig.nodeSize);
   if (el.publicationLineWidth) el.publicationLineWidth.value = String(publicationConfig.lineWidth);
   if (el.publicationLabelsToggle) el.publicationLabelsToggle.checked = Boolean(publicationConfig.showLabels);
-  if (el.publicationFocusLinksToggle) el.publicationFocusLinksToggle.checked = Boolean(publicationConfig.focusLinksOnSelection);
 }
 
 function handlePublicationConfigChange() {
@@ -2989,7 +3081,6 @@ function handlePublicationConfigChange() {
     nodeSize: Number(el.publicationNodeSize?.value || DEFAULT_PUBLICATION_CONFIG.nodeSize),
     lineWidth: Number(el.publicationLineWidth?.value || DEFAULT_PUBLICATION_CONFIG.lineWidth),
     showLabels: Boolean(el.publicationLabelsToggle?.checked),
-    focusLinksOnSelection: Boolean(el.publicationFocusLinksToggle?.checked),
     search: cleanTextLine(el.publicationSearch?.value || ""),
     filters: {
       FQ: Boolean(el.publicationFilterFq?.checked),
@@ -3007,7 +3098,7 @@ function renderPublicationNetwork() {
   syncPublicationPhysicsState();
   const visibleNodes = getVisiblePublicationNodes();
   const visibleIds = new Set(visibleNodes.map((node) => node.id));
-  const links = getPublicationLinksForDisplay(visibleIds);
+  const links = publicationNetwork.links.filter((link) => visibleIds.has(link.from) && visibleIds.has(link.to));
   const rect = el.publicationCanvas.getBoundingClientRect();
   const width = Math.max(1, rect.width);
   const height = Math.max(1, rect.height);
@@ -3017,8 +3108,9 @@ function renderPublicationNetwork() {
   el.publicationCanvas.style.setProperty("--publication-cell-intensity", `${publicationConfig.intensity / 100}`);
   el.publicationCanvas.classList.toggle("hide-labels", !publicationConfig.showLabels);
 
+  el.publicationLinks.textContent = "";
   el.publicationLinks.setAttribute("viewBox", `0 0 ${width} ${height}`);
-  rebuildPublicationLinkElements(links, width, height);
+  links.forEach((link) => drawPublicationLink(link, width, height));
 
   el.publicationNodes.textContent = "";
   visibleNodes.forEach((node) => el.publicationNodes.appendChild(createPublicationNodeElement(node)));
@@ -3027,89 +3119,21 @@ function renderPublicationNetwork() {
   renderPublicationInfoPanel();
 }
 
-// Em redes grandes, mostrar todos os links de uma vez vira uma "bola de fios"
-// (ver relato de rede com 671 documentos). Por padrão só os links do item
-// selecionado aparecem; com o modo desligado, volta a mostrar tudo.
-// (PUBLICATION_MAX_RENDERED_LINKS fica declarada perto do topo do arquivo,
-// não aqui: initPublicationNetwork() roda assim que a página carrega e já
-// chama getPublicationLinksForDisplay logo abaixo — uma const só existe a
-// partir da linha onde é declarada, então declará-la aqui embaixo quebrava
-// a página inteira com "Cannot access ... before initialization".)
-
-// A física da mola entre nós ligados também precisa desse teto: sem ele, uma
-// rede com links legados em excesso recalcularia centenas de milhares de
-// molas a cada frame de animação (60x por segundo), travando a aba mesmo que
-// a renderização em si já esteja limitada.
-function getPublicationLinksForPhysics() {
-  return publicationNetwork.links.length > PUBLICATION_MAX_RENDERED_LINKS
-    ? publicationNetwork.links.slice(0, PUBLICATION_MAX_RENDERED_LINKS)
-    : publicationNetwork.links;
-}
-
-function getPublicationLinksForDisplay(visibleIds) {
-  const baseLinks = publicationNetwork.links.filter((link) => visibleIds.has(link.from) && visibleIds.has(link.to));
-
-  // Filtra pela seleção (quando o modo de foco está ligado) antes de aplicar
-  // o teto de segurança, para não cortar justo os links do nó selecionado.
-  const scoped = publicationConfig.focusLinksOnSelection
-    ? (selectedPublicationId
-      ? baseLinks.filter((link) => link.from === selectedPublicationId || link.to === selectedPublicationId)
-      : [])
-    : baseLinks;
-
-  return scoped.length > PUBLICATION_MAX_RENDERED_LINKS
-    ? scoped.slice(0, PUBLICATION_MAX_RENDERED_LINKS)
-    : scoped;
-}
-
-// Reconstrói só as linhas (sem recriar os nós) refletindo a seleção atual.
-// Usado no clique/início de arraste, que precisa atualizar o conjunto de
-// links exibidos imediatamente quando o modo de foco está ativo.
-function refreshPublicationLinksForSelection() {
-  if (!el.publicationCanvas || !el.publicationLinks) return;
-  const visibleIds = new Set(getVisiblePublicationNodes().map((node) => node.id));
-  const links = getPublicationLinksForDisplay(visibleIds);
-  const rect = el.publicationCanvas.getBoundingClientRect();
-  const width = Math.max(1, rect.width);
-  const height = Math.max(1, rect.height);
-  el.publicationLinks.setAttribute("viewBox", `0 0 ${width} ${height}`);
-  rebuildPublicationLinkElements(links, width, height);
-}
-
-function getPublicationLinkKey(link) {
-  return `${link.from}::${link.to}`;
-}
-
-// Reconstrói os elementos <line> do zero (usado quando a topologia, os filtros
-// ou o estilo mudam). O loop de animação NÃO passa por aqui: ele reaproveita os
-// elementos já criados via updatePublicationLinkPosition, o que evita recriar
-// milhares de nós SVG a cada um dos 60 frames por segundo.
-function rebuildPublicationLinkElements(links, width, height) {
-  el.publicationLinks.textContent = "";
-  publicationLinkElements = new Map();
-
-  links.forEach((link) => {
-    const source = getPublicationNode(link.from);
-    const target = getPublicationNode(link.to);
-    if (!source || !target) return;
-
-    const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
-    line.setAttribute("stroke-width", String(publicationConfig.lineWidth));
-    line.setAttribute("class", getPublicationLinkClass(source, target));
-    updatePublicationLinkPosition(line, source, target, width, height);
-
-    publicationLinkElements.set(getPublicationLinkKey(link), line);
-    el.publicationLinks.appendChild(line);
-  });
-}
-
-function updatePublicationLinkPosition(line, source, target, width, height) {
+function drawPublicationLink(link, width, height) {
+  const source = getPublicationNode(link.from);
+  const target = getPublicationNode(link.to);
+  if (!source || !target) return;
   const sourcePosition = getPublicationDisplayPosition(source);
   const targetPosition = getPublicationDisplayPosition(target);
+
+  const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
   line.setAttribute("x1", String((sourcePosition.x / 100) * width));
   line.setAttribute("y1", String((sourcePosition.y / 100) * height));
   line.setAttribute("x2", String((targetPosition.x / 100) * width));
   line.setAttribute("y2", String((targetPosition.y / 100) * height));
+  line.setAttribute("stroke-width", String(publicationConfig.lineWidth));
+  line.setAttribute("class", getPublicationLinkClass(source, target));
+  el.publicationLinks.appendChild(line);
 }
 
 function createPublicationNodeElement(node) {
@@ -3143,16 +3167,10 @@ function attachPublicationNodeDrag(button, nodeId) {
   const move = (event) => {
     if (!dragging || !el.publicationCanvas) return;
     const rect = el.publicationCanvas.getBoundingClientRect();
-    // O layer de zoom só transforma visualmente; para saber onde o ponteiro
-    // está no espaço lógico (0-100%) é preciso desfazer o zoom/pan atual.
-    const localX = event.clientX - rect.left;
-    const localY = event.clientY - rect.top;
-    const contentX = (localX - publicationZoomX) / publicationZoomScale;
-    const contentY = (localY - publicationZoomY) / publicationZoomScale;
     updatePublicationNodePosition(
       nodeId,
-      (contentX / rect.width) * 100,
-      (contentY / rect.height) * 100
+      ((event.clientX - rect.left) / rect.width) * 100,
+      ((event.clientY - rect.top) / rect.height) * 100
     );
   };
 
@@ -3173,7 +3191,7 @@ function attachPublicationNodeDrag(button, nodeId) {
     Array.from(el.publicationNodes?.children || []).forEach((item) => {
       item.classList.toggle("selected", item.dataset.publicationId === nodeId);
     });
-    refreshPublicationLinksForSelection();
+    renderPublicationLinksOnly();
     renderPublicationInfoPanel();
   });
   button.addEventListener("pointermove", move);
@@ -3182,8 +3200,8 @@ function attachPublicationNodeDrag(button, nodeId) {
 }
 
 function updatePublicationNodePosition(nodeId, x, y) {
-  const nextX = clampNumber(x, PUBLICATION_FIELD_MIN, PUBLICATION_FIELD_MAX);
-  const nextY = clampNumber(y, PUBLICATION_FIELD_MIN, PUBLICATION_FIELD_MAX);
+  const nextX = clampNumber(x, 5, 95);
+  const nextY = clampNumber(y, 8, 92);
   const physicsNode = publicationPhysicsNodes.get(nodeId);
   if (physicsNode) {
     physicsNode.x = nextX;
@@ -3233,8 +3251,8 @@ function handlePublicationNodeSubmit(event) {
     code,
     title,
     sector: sector || "Publicações",
-    x: clampNumber(50 + Math.cos(angle) * 30, PUBLICATION_FIELD_MIN, PUBLICATION_FIELD_MAX),
-    y: clampNumber(52 + Math.sin(angle) * 30, PUBLICATION_FIELD_MIN, PUBLICATION_FIELD_MAX)
+    x: clampNumber(50 + Math.cos(angle) * 28, 8, 92),
+    y: clampNumber(52 + Math.sin(angle) * 28, 10, 90)
   };
 
   const nextNodes = [...publicationNetwork.nodes, node];
@@ -3292,8 +3310,8 @@ function resetPublicationLayout() {
       const angle = (index / total) * Math.PI * 2;
       return {
         ...node,
-        x: clampNumber(50 + Math.cos(angle) * 32, PUBLICATION_FIELD_MIN, PUBLICATION_FIELD_MAX),
-        y: clampNumber(52 + Math.sin(angle) * 32, PUBLICATION_FIELD_MIN, PUBLICATION_FIELD_MAX)
+        x: clampNumber(50 + Math.cos(angle) * 30, 8, 92),
+        y: clampNumber(52 + Math.sin(angle) * 30, 10, 90)
       };
     })
   };
@@ -3360,8 +3378,8 @@ function syncPublicationPhysicsState() {
   publicationNetwork.nodes.forEach((node) => {
     const previous = previousNodes.get(node.id);
     nextNodes.set(node.id, {
-      x: previous ? clampNumber(previous.x, PUBLICATION_FIELD_MIN, PUBLICATION_FIELD_MAX) : node.x,
-      y: previous ? clampNumber(previous.y, PUBLICATION_FIELD_MIN, PUBLICATION_FIELD_MAX) : node.y,
+      x: previous ? clampNumber(previous.x, 5, 95) : node.x,
+      y: previous ? clampNumber(previous.y, 8, 92) : node.y,
       vx: previous?.vx || 0,
       vy: previous?.vy || 0,
       targetX: node.x,
@@ -3375,19 +3393,14 @@ function syncPublicationPhysicsState() {
 function stepPublicationPhysics(delta, now) {
   if (!publicationNetwork.nodes.length) return;
 
-  // Forças bem mais suaves que a versão original: o objetivo é um movimento
-  // lento e contínuo (deriva), não um reposicionamento rápido a cada frame.
-  // A repulsão em especial foi reduzida bastante, já que com muitos
-  // documentos vários nós ficam perto do limite mínimo de distância o tempo
-  // todo, e uma repulsão forte nesse caso deixa a rede "nervosa".
   const intensity = clampNumber(publicationConfig.intensity, 10, 100) / 100;
-  const centerStrength = 0.0008 + intensity * 0.001;
-  const targetStrength = 0.003 + intensity * 0.003;
-  const repulsionStrength = 2 + intensity * 3;
-  const linkStrength = 0.006 + intensity * 0.004;
+  const centerStrength = 0.0012 + intensity * 0.0016;
+  const targetStrength = 0.006 + intensity * 0.006;
+  const repulsionStrength = 7 + intensity * 9;
+  const linkStrength = 0.009 + intensity * 0.007;
   const desiredLinkDistance = 22 + Math.min(publicationConfig.nodeSize, 90) * 0.08;
-  const damping = Math.pow(0.95 - intensity * 0.015, delta);
-  const driftStrength = 0.0008 + intensity * 0.0012;
+  const damping = Math.pow(0.88 - intensity * 0.025, delta);
+  const driftStrength = 0.002 + intensity * 0.004;
 
   publicationNetwork.nodes.forEach((node) => {
     const physicsNode = publicationPhysicsNodes.get(node.id);
@@ -3405,13 +3418,37 @@ function stepPublicationPhysics(delta, now) {
     const seed = getPublicationNodeSeed(node.id);
     physicsNode.vx += ((physicsNode.targetX - physicsNode.x) * targetStrength + (50 - physicsNode.x) * centerStrength) * delta;
     physicsNode.vy += ((physicsNode.targetY - physicsNode.y) * targetStrength + (50 - physicsNode.y) * centerStrength) * delta;
-    physicsNode.vx += Math.sin(now * 0.00018 + seed) * driftStrength * delta;
-    physicsNode.vy += Math.cos(now * 0.00015 + seed * 1.4) * driftStrength * delta;
+    physicsNode.vx += Math.sin(now * 0.00055 + seed) * driftStrength * delta;
+    physicsNode.vy += Math.cos(now * 0.00048 + seed * 1.4) * driftStrength * delta;
   });
 
-  applyPublicationRepulsionForces(repulsionStrength, delta);
+  for (let index = 0; index < publicationNetwork.nodes.length; index += 1) {
+    for (let otherIndex = index + 1; otherIndex < publicationNetwork.nodes.length; otherIndex += 1) {
+      const current = publicationNetwork.nodes[index];
+      const other = publicationNetwork.nodes[otherIndex];
+      const currentPhysics = publicationPhysicsNodes.get(current.id);
+      const otherPhysics = publicationPhysicsNodes.get(other.id);
+      if (!currentPhysics || !otherPhysics) continue;
 
-  getPublicationLinksForPhysics().forEach((link) => {
+      const dx = currentPhysics.x - otherPhysics.x || 0.01;
+      const dy = currentPhysics.y - otherPhysics.y || 0.01;
+      const distance = Math.max(Math.hypot(dx, dy), 5);
+      const repulsion = repulsionStrength / (distance * distance);
+      const forceX = (dx / distance) * repulsion * delta;
+      const forceY = (dy / distance) * repulsion * delta;
+
+      if (current.id !== publicationDraggedNodeId) {
+        currentPhysics.vx += forceX;
+        currentPhysics.vy += forceY;
+      }
+      if (other.id !== publicationDraggedNodeId) {
+        otherPhysics.vx -= forceX;
+        otherPhysics.vy -= forceY;
+      }
+    }
+  }
+
+  publicationNetwork.links.forEach((link) => {
     const sourcePhysics = publicationPhysicsNodes.get(link.from);
     const targetPhysics = publicationPhysicsNodes.get(link.to);
     if (!sourcePhysics || !targetPhysics) return;
@@ -3442,100 +3479,14 @@ function stepPublicationPhysics(delta, now) {
     physicsNode.x += physicsNode.vx * delta;
     physicsNode.y += physicsNode.vy * delta;
 
-    if (physicsNode.x < PUBLICATION_FIELD_MIN || physicsNode.x > PUBLICATION_FIELD_MAX) {
-      physicsNode.x = clampNumber(physicsNode.x, PUBLICATION_FIELD_MIN, PUBLICATION_FIELD_MAX);
-      physicsNode.vx *= -0.12;
+    if (physicsNode.x < 5 || physicsNode.x > 95) {
+      physicsNode.x = clampNumber(physicsNode.x, 5, 95);
+      physicsNode.vx *= -0.22;
     }
-    if (physicsNode.y < PUBLICATION_FIELD_MIN || physicsNode.y > PUBLICATION_FIELD_MAX) {
-      physicsNode.y = clampNumber(physicsNode.y, PUBLICATION_FIELD_MIN, PUBLICATION_FIELD_MAX);
-      physicsNode.vy *= -0.12;
+    if (physicsNode.y < 8 || physicsNode.y > 92) {
+      physicsNode.y = clampNumber(physicsNode.y, 8, 92);
+      physicsNode.vy *= -0.22;
     }
-  });
-}
-
-// A repulsão entre pares de nós é a parte que mais custa da simulação: comparar
-// todos contra todos (O(n²)) é inviável acima de algumas centenas de documentos
-// (com 3000 nós isso seria 9 milhões de comparações a cada frame, 60x por
-// segundo). Em vez disso, os nós são agrupados em uma grade espacial e cada um
-// só é comparado com vizinhos próximos (O(n) na prática), já que a força cai
-// com o quadrado da distância e é desprezível além de poucas células.
-// A área útil do canvas (em % de posição) é (PUBLICATION_FIELD_MAX -
-// PUBLICATION_FIELD_MIN)²; o tamanho de célula se adapta à quantidade de nós
-// para manter uma densidade média por célula, o que mantém o custo por frame
-// baixo tanto com 105 quanto com 3000+ nós.
-const PUBLICATION_REPULSION_AREA = (PUBLICATION_FIELD_MAX - PUBLICATION_FIELD_MIN) ** 2;
-const PUBLICATION_REPULSION_TARGET_PER_CELL = 8;
-const PUBLICATION_REPULSION_MIN_CELL_SIZE = 6;
-const PUBLICATION_REPULSION_MAX_CELL_SIZE = 24;
-const PUBLICATION_REPULSION_GRID_OFFSET = 1000;
-const PUBLICATION_REPULSION_NEIGHBOR_OFFSETS = [
-  [0, 0],
-  [1, 0],
-  [0, 1],
-  [1, 1],
-  [-1, 1]
-];
-
-function getPublicationRepulsionCellSize(nodeCount) {
-  if (nodeCount <= 0) return PUBLICATION_REPULSION_MAX_CELL_SIZE;
-  const idealSize = Math.sqrt((PUBLICATION_REPULSION_AREA * PUBLICATION_REPULSION_TARGET_PER_CELL) / nodeCount);
-  return clampNumber(idealSize, PUBLICATION_REPULSION_MIN_CELL_SIZE, PUBLICATION_REPULSION_MAX_CELL_SIZE);
-}
-
-function buildPublicationRepulsionGrid(cellSize) {
-  const grid = new Map();
-  publicationNetwork.nodes.forEach((node) => {
-    const physicsNode = publicationPhysicsNodes.get(node.id);
-    if (!physicsNode) return;
-    const cellX = Math.floor(physicsNode.x / cellSize) + PUBLICATION_REPULSION_GRID_OFFSET;
-    const cellY = Math.floor(physicsNode.y / cellSize) + PUBLICATION_REPULSION_GRID_OFFSET;
-    const key = cellX * 1000000 + cellY;
-    if (!grid.has(key)) grid.set(key, { cellX, cellY, nodes: [] });
-    grid.get(key).nodes.push(node);
-  });
-  return grid;
-}
-
-function applyPublicationRepulsionForce(current, other, repulsionStrength, delta) {
-  const currentPhysics = publicationPhysicsNodes.get(current.id);
-  const otherPhysics = publicationPhysicsNodes.get(other.id);
-  if (!currentPhysics || !otherPhysics) return;
-
-  const dx = currentPhysics.x - otherPhysics.x || 0.01;
-  const dy = currentPhysics.y - otherPhysics.y || 0.01;
-  const distance = Math.max(Math.hypot(dx, dy), 5);
-  const repulsion = repulsionStrength / (distance * distance);
-  const forceX = (dx / distance) * repulsion * delta;
-  const forceY = (dy / distance) * repulsion * delta;
-
-  if (current.id !== publicationDraggedNodeId) {
-    currentPhysics.vx += forceX;
-    currentPhysics.vy += forceY;
-  }
-  if (other.id !== publicationDraggedNodeId) {
-    otherPhysics.vx -= forceX;
-    otherPhysics.vy -= forceY;
-  }
-}
-
-function applyPublicationRepulsionForces(repulsionStrength, delta) {
-  const cellSize = getPublicationRepulsionCellSize(publicationNetwork.nodes.length);
-  const grid = buildPublicationRepulsionGrid(cellSize);
-
-  grid.forEach((cell) => {
-    PUBLICATION_REPULSION_NEIGHBOR_OFFSETS.forEach(([offsetX, offsetY]) => {
-      const neighborKey = (cell.cellX + offsetX) * 1000000 + (cell.cellY + offsetY);
-      const neighbor = grid.get(neighborKey);
-      if (!neighbor) return;
-      const sameCell = offsetX === 0 && offsetY === 0;
-
-      for (let index = 0; index < cell.nodes.length; index += 1) {
-        const startIndex = sameCell ? index + 1 : 0;
-        for (let otherIndex = startIndex; otherIndex < neighbor.nodes.length; otherIndex += 1) {
-          applyPublicationRepulsionForce(cell.nodes[index], neighbor.nodes[otherIndex], repulsionStrength, delta);
-        }
-      }
-    });
   });
 }
 
@@ -3543,8 +3494,8 @@ function getPublicationDisplayPosition(node) {
   const physicsNode = publicationPhysicsNodes.get(node.id);
   if (!physicsNode) return { x: node.x, y: node.y };
   return {
-    x: clampNumber(physicsNode.x, PUBLICATION_DISPLAY_MIN, PUBLICATION_DISPLAY_MAX),
-    y: clampNumber(physicsNode.y, PUBLICATION_DISPLAY_MIN, PUBLICATION_DISPLAY_MAX)
+    x: clampNumber(physicsNode.x, 4, 96),
+    y: clampNumber(physicsNode.y, 7, 93)
   };
 }
 
@@ -3554,24 +3505,17 @@ function getPublicationNodeSeed(id) {
     .reduce((sum, char, index) => sum + char.charCodeAt(0) * (index + 1), 0) % 97;
 }
 
-// Chamada a cada frame de animação e a cada arraste: só reposiciona as linhas
-// já existentes (criadas por rebuildPublicationLinkElements), sem tocar no DOM
-// além de atualizar atributos. Com redes de milhares de documentos, recriar
-// todas as linhas 60x por segundo travaria a página.
 function renderPublicationLinksOnly() {
   if (!el.publicationCanvas || !el.publicationLinks) return;
+  const visibleIds = new Set(getVisiblePublicationNodes().map((node) => node.id));
   const rect = el.publicationCanvas.getBoundingClientRect();
   const width = Math.max(1, rect.width);
   const height = Math.max(1, rect.height);
+  el.publicationLinks.textContent = "";
   el.publicationLinks.setAttribute("viewBox", `0 0 ${width} ${height}`);
-
-  publicationLinkElements.forEach((line, key) => {
-    const [from, to] = key.split("::");
-    const source = getPublicationNode(from);
-    const target = getPublicationNode(to);
-    if (!source || !target) return;
-    updatePublicationLinkPosition(line, source, target, width, height);
-  });
+  publicationNetwork.links
+    .filter((link) => visibleIds.has(link.from) && visibleIds.has(link.to))
+    .forEach((link) => drawPublicationLink(link, width, height));
 }
 
 function applyPublicationNodeDomPositions() {
@@ -3643,7 +3587,6 @@ function renderPublicationInfoPanel() {
     ["Nome do documento", selected.title],
     ["Setor", selected.sector || "Publicações"],
     ["Setor adjacente", selected.adjacentSector || "-"],
-    ["Documentos relacionados (código)", selected.relatedCodes || "-"],
     ["Desenvolvido por", selected.developedBy || "-"],
     ["Revisões", selected.revisions || "-"],
     ["Vínculos", linkedCodes],
@@ -3714,15 +3657,7 @@ function loadStoredPublicationNetwork() {
 }
 
 function savePublicationNetwork() {
-  try {
-    localStorage.setItem(PUBLICATION_NETWORK_KEY, JSON.stringify(publicationNetwork));
-  } catch (error) {
-    // Uma rede com uma quantidade de links muito acima do normal (dado
-    // legado) pode estourar a cota do localStorage. Sem o try/catch, isso
-    // interrompia a função no meio de uma ação (arrastar, importar, etc.) e
-    // pulava os passos seguintes, como o re-render.
-    console.warn("Não foi possível salvar a rede de publicações localmente.", error);
-  }
+  localStorage.setItem(PUBLICATION_NETWORK_KEY, JSON.stringify(publicationNetwork));
 }
 
 function loadStoredPublicationConfig() {
@@ -3752,20 +3687,8 @@ function normalizePublicationNode(node) {
   const title = cleanTextLine(node?.title || "");
   if (!type || !code || !title) return null;
 
-  const id = cleanTextLine(node.id || slugifyAreaName(`${type}-${code}`));
-  // node.x/node.y podem vir corrompidos de uma versão anterior salva no
-  // localStorage (ex.: NaN). clampNumber joga valores inválidos para o limite
-  // mínimo do campo — o que, com um campo simétrico, é literalmente o canto
-  // superior esquerdo, empilhando todo nó corrompido no mesmo ponto. Em vez
-  // disso, um nó inválido cai numa posição espalhada (derivada do próprio id)
-  // em vez de colapsar no canto.
-  const rawX = Number(node.x);
-  const rawY = Number(node.y);
-  const hasValidPosition = Number.isFinite(rawX) && Number.isFinite(rawY);
-  const fallbackAngle = (getPublicationNodeSeed(id) / 97) * Math.PI * 2;
-
   return {
-    id,
+    id: cleanTextLine(node.id || slugifyAreaName(`${type}-${code}`)),
     type,
     code,
     title,
@@ -3774,16 +3697,11 @@ function normalizePublicationNode(node) {
     adjacentSector: cleanTextLine(node.adjacentSector || node.setorAdjacente || ""),
     developedBy: cleanTextLine(node.developedBy || node.desenvolvidoPor || ""),
     revisions: cleanTextLine(node.revisions || node.revisoes || node.revisões || ""),
-    relatedCodes: cleanTextLine(node.relatedCodes || ""),
     sourceFile: cleanTextLine(node.sourceFile || ""),
     sourceSheet: cleanTextLine(node.sourceSheet || ""),
     sourceRow: Number(node.sourceRow || 0),
-    x: hasValidPosition
-      ? clampNumber(rawX, PUBLICATION_FIELD_MIN, PUBLICATION_FIELD_MAX)
-      : clampNumber(50 + Math.cos(fallbackAngle) * 30, PUBLICATION_FIELD_MIN, PUBLICATION_FIELD_MAX),
-    y: hasValidPosition
-      ? clampNumber(rawY, PUBLICATION_FIELD_MIN, PUBLICATION_FIELD_MAX)
-      : clampNumber(52 + Math.sin(fallbackAngle) * 30, PUBLICATION_FIELD_MIN, PUBLICATION_FIELD_MAX)
+    x: clampNumber(Number(node.x), 5, 95),
+    y: clampNumber(Number(node.y), 8, 92)
   };
 }
 
@@ -3805,10 +3723,9 @@ function normalizePublicationConfig(value) {
   const source = value && typeof value === "object" ? value : DEFAULT_PUBLICATION_CONFIG;
   return {
     intensity: clampNumber(Number(source.intensity), 40, 100),
-    nodeSize: clampNumber(Number(source.nodeSize), 18, 70),
+    nodeSize: clampNumber(Number(source.nodeSize), 44, 86),
     lineWidth: clampNumber(Number(source.lineWidth), 1, 8),
     showLabels: source.showLabels !== false,
-    focusLinksOnSelection: source.focusLinksOnSelection === true,
     search: cleanTextLine(source.search || ""),
     filters: {
       FQ: source.filters?.FQ !== false,
@@ -5937,8 +5854,28 @@ function updateDashboard() {
   renderDashboardPanels();
 }
 
+let gerarGraficoRetryCount = 0;
+
 function gerarGrafico() {
-  if (typeof Chart === "undefined") return;
+  if (typeof Chart === "undefined") {
+    // Em algumas redes o CDN do Chart.js demora ou falha para carregar; em vez de
+    // desistir e deixar a área do gráfico em branco para sempre, tentamos de novo
+    // por alguns segundos (o index.html também carrega um CDN alternativo se o
+    // principal falhar).
+    if (gerarGraficoRetryCount < 40) {
+      gerarGraficoRetryCount++;
+      setTimeout(gerarGrafico, 250);
+    } else {
+      console.warn("Chart.js não carregou; os gráficos do Dashboard ficaram indisponíveis.");
+      const chartFrame = document.getElementById("grafico")?.closest(".chart-frame");
+      const donutFrame = document.getElementById("graficoPizza")?.closest(".donut-frame");
+      const msg = "Não foi possível carregar a biblioteca de gráficos. Verifique sua conexão e recarregue a página.";
+      if (chartFrame) chartFrame.innerHTML = `<p class="chart-fallback-msg">${msg}</p>`;
+      if (donutFrame) donutFrame.innerHTML = `<p class="chart-fallback-msg">${msg}</p>`;
+    }
+    return;
+  }
+  gerarGraficoRetryCount = 0;
   if (chart) chart.destroy();
   if (chartPizza) chartPizza.destroy();
 
