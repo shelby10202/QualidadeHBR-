@@ -923,6 +923,14 @@ const el = {
   auditCriarNewBtn: document.getElementById("auditCriarNewBtn"),
   auditCriarList: document.getElementById("auditCriarList"),
   auditCriarEmptyState: document.getElementById("auditCriarEmptyState"),
+  auditCriarOverview: document.getElementById("auditCriarOverview"),
+  auditCriarOverviewPeriod: document.getElementById("auditCriarOverviewPeriod"),
+  auditCriarOverviewNav: document.getElementById("auditCriarOverviewNav"),
+  auditCriarOverviewStats: document.getElementById("auditCriarOverviewStats"),
+  auditCriarOverviewSummary: document.getElementById("auditCriarOverviewSummary"),
+  auditCriarOverviewChart: document.getElementById("auditCriarOverviewChart"),
+  auditCriarOverviewChartEmpty: document.getElementById("auditCriarOverviewChartEmpty"),
+  auditCriarOverviewEmpty: document.getElementById("auditCriarOverviewEmpty"),
   auditCriarFormBackBtn: document.getElementById("auditCriarFormBackBtn"),
   auditCriarForm: document.getElementById("auditCriarForm"),
   auditCriarNumero: document.getElementById("auditCriarNumero"),
@@ -1079,6 +1087,8 @@ let auditCriarCurrentAuditoria = null;
 let auditCriarCurrentChecklist = null; // template object da checklist em preenchimento
 let auditCriarCurrentValues = {}; // { itemN: { status, nota } }
 let auditCriarCurrentGrcFields = {};
+let auditCriarOverviewSelectedId = null;
+let auditCriarOverviewChart = null;
 
 function prepareStaticShells() {
   // O dashboard antigo e parcialmente estatico e substituido por uma estrutura unica.
@@ -1618,7 +1628,7 @@ async function buildFq073Data(auditoria) {
   const omsRaw = relatedNcs.filter((item) => normalizeText(item.type || "") === "om");
 
   const ncs = ncsRaw.map((item, index) => {
-    const setor = [item.ncDept, item.ncSector].map((v) => (v || "").trim()).filter(Boolean).join(" / ");
+    const setor = item.setorArea || [item.ncDept, item.ncSector].map((v) => (v || "").trim()).filter(Boolean).join(" / ");
     return {
       numero: String(index + 1).padStart(3, "0"),
       setorArea: `${setor || "-"}${item.ncNumber ? ` — Ref: ${item.ncNumber}` : ""}`,
@@ -1630,10 +1640,18 @@ async function buildFq073Data(auditoria) {
     };
   });
 
-  const oms = omsRaw.map((item, index) => ({
-    numero: String(index + 1).padStart(3, "0"),
-    texto: item.description || ""
-  }));
+  const oms = omsRaw.map((item, index) => {
+    const setor = item.setorArea || [item.ncDept, item.ncSector].map((v) => (v || "").trim()).filter(Boolean).join(" / ");
+    const linhas = [`a) Setor/Área: ${setor || "-"}`, `b) Evidência Objetiva: ${item.description || ""}`];
+    if (item.requisito) linhas.push(`c) Requisito: ${item.requisito}`);
+    if (item.riskAnalysis) linhas.push(`d) Avaliação de Risco: ${item.riskAnalysis}`);
+    if (item.deadline) linhas.push(`e) Prazo: ${formatAuditDateForDoc(item.deadline)}`);
+    return {
+      numero: String(index + 1).padStart(3, "0"),
+      texto: linhas.join("\n"),
+      _record: item
+    };
+  });
 
   const observacoesLines = (auditoria.observacoesGerais || "")
     .split("\n")
@@ -1679,7 +1697,11 @@ async function buildFq073Data(auditoria) {
   for (const nc of ncs) {
     await addPhotoEntries(nc._record.fotos, `NC${nc.numero} (${nc._record.ncNumber || ""})`);
   }
+  for (const om of oms) {
+    await addPhotoEntries(om._record.fotos, `OM${om.numero} (${om._record.ncNumber || ""})`);
+  }
   ncs.forEach((nc) => delete nc._record);
+  oms.forEach((om) => delete om._record);
 
   const data = {
     auditNumber: auditoria.auditNumber || "",
@@ -1728,6 +1750,13 @@ async function emitFq073Report(auditoria, triggerBtn) {
   if (triggerBtn) triggerBtn.textContent = "Gerando relatório...";
 
   try {
+    // As NCs/OMs (coleção "nao_conformidades") são carregadas sob demanda só quando a aba
+    // "NC e OM" é aberta. Se o usuário gera o relatório sem nunca ter aberto essa aba, os
+    // dados ficam vazios em memória e o Parte II do FQ-073 sai em branco — por isso
+    // garantimos o carregamento aqui antes de montar os dados do relatório.
+    await carregarAuditoriaNc();
+    if (auditNcLoadError) throw new Error(auditNcLoadError);
+
     const res = await fetch(FQ073_TEMPLATE_URL);
     if (!res.ok) throw new Error(`HTTP ${res.status} ao buscar ${FQ073_TEMPLATE_URL}`);
     const templateBuffer = await res.arrayBuffer();
@@ -2282,8 +2311,152 @@ function auditoriaChecklistsFor(auditoriaId) {
   return auditoriaChecklistsData.filter((c) => c.auditoriaId === auditoriaId);
 }
 
+// ===== Resumo estilo "GitHub Pulse": lista de auditorias à esquerda + painel de resumo à direita =====
+function renderAuditCriarOverview() {
+  if (!el.auditCriarOverviewNav) return;
+
+  const list = [...auditoriasData].sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")));
+
+  if (!list.length) {
+    if (el.auditCriarOverview) el.auditCriarOverview.hidden = true;
+    if (el.auditCriarOverviewEmpty) el.auditCriarOverviewEmpty.hidden = false;
+    return;
+  }
+  if (el.auditCriarOverview) el.auditCriarOverview.hidden = false;
+  if (el.auditCriarOverviewEmpty) el.auditCriarOverviewEmpty.hidden = true;
+
+  if (!auditCriarOverviewSelectedId || !list.some((a) => a.id === auditCriarOverviewSelectedId)) {
+    auditCriarOverviewSelectedId = list[0].id;
+  }
+
+  if (el.auditCriarOverviewPeriod) {
+    el.auditCriarOverviewPeriod.textContent = `${list.length} auditoria${list.length === 1 ? "" : "s"} no total`;
+  }
+
+  el.auditCriarOverviewNav.innerHTML = "";
+  list.forEach((auditoria) => {
+    const status = auditoria.status || "Em Progresso";
+    const isActive = auditoria.id === auditCriarOverviewSelectedId;
+    const item = document.createElement("button");
+    item.type = "button";
+    item.className = `audit-criar-overview-nav-item${isActive ? " active" : ""}`;
+    item.innerHTML = `
+      <span class="audit-criar-overview-nav-title">${escapeHtml(auditoria.auditNumber || "Sem número")}</span>
+      <span class="audit-criar-overview-nav-meta">
+        <span class="audit-status-pill ${auditoriaStatusToneClass(status)}">${escapeHtml(status)}</span>
+        <span class="audit-criar-overview-nav-period">${escapeHtml(formatAuditPeriod(auditoria.dateStart, auditoria.dateEnd) || "-")}</span>
+      </span>
+    `;
+    item.addEventListener("click", () => {
+      auditCriarOverviewSelectedId = auditoria.id;
+      renderAuditCriarOverview();
+    });
+    el.auditCriarOverviewNav.appendChild(item);
+  });
+
+  const selected = list.find((a) => a.id === auditCriarOverviewSelectedId) || list[0];
+  renderAuditCriarOverviewDetail(selected);
+}
+
+function renderAuditCriarOverviewDetail(auditoria) {
+  if (!auditoria) return;
+  const checklists = auditoriaChecklistsFor(auditoria.id);
+  const totalChecklists = checklists.length;
+  const totalTemplates = AUDIT_CHECKLIST_TEMPLATES.length;
+  const ncTotal = checklists.reduce((sum, c) => sum + (c.ncCount || 0), 0);
+  const omTotal = checklists.reduce((sum, c) => sum + (c.omCount || 0), 0);
+  const mediaConformidade = totalChecklists
+    ? Math.round(checklists.reduce((sum, c) => sum + (c.indiceConformidade || 0), 0) / totalChecklists)
+    : 0;
+
+  if (el.auditCriarOverviewStats) {
+    el.auditCriarOverviewStats.innerHTML = `
+      <div class="audit-criar-overview-stat">
+        <strong>${totalChecklists}/${totalTemplates}</strong>
+        <span>Checklists preenchidos</span>
+      </div>
+      <div class="audit-criar-overview-stat">
+        <strong>${mediaConformidade}%</strong>
+        <span>Índice de conformidade médio</span>
+      </div>
+      <div class="audit-criar-overview-stat">
+        <strong>${ncTotal}</strong>
+        <span>Não conformidades</span>
+      </div>
+      <div class="audit-criar-overview-stat">
+        <strong>${omTotal}</strong>
+        <span>Oportunidades de melhoria</span>
+      </div>
+    `;
+  }
+
+  if (el.auditCriarOverviewSummary) {
+    const periodo = formatAuditPeriod(auditoria.dateStart, auditoria.dateEnd) || "-";
+    const status = auditoria.status || "Em Progresso";
+    const numero = escapeHtml(auditoria.auditNumber || "sem número");
+    let summary;
+    if (!totalChecklists) {
+      summary = `A auditoria <strong>${numero}</strong> (${escapeHtml(periodo)}) ainda não tem nenhum checklist preenchido.`;
+    } else {
+      summary = `Na auditoria <strong>${numero}</strong> (${escapeHtml(periodo)}), <strong>${totalChecklists}</strong> checklist${
+        totalChecklists === 1 ? "" : "s"
+      } de setor ${totalChecklists === 1 ? "foi preenchido" : "foram preenchidos"}, com índice de conformidade médio de <strong>${mediaConformidade}%</strong>. Foram identificadas <strong>${ncTotal}</strong> não conformidade${
+        ncTotal === 1 ? "" : "s"
+      } e <strong>${omTotal}</strong> oportunidade${omTotal === 1 ? "" : "s"} de melhoria. Status atual: <strong>${escapeHtml(status)}</strong>.`;
+    }
+    el.auditCriarOverviewSummary.innerHTML = summary;
+  }
+
+  renderAuditCriarOverviewChart(checklists);
+}
+
+function renderAuditCriarOverviewChart(checklists) {
+  const canvas = el.auditCriarOverviewChart;
+  if (!canvas || typeof Chart === "undefined") return;
+  const wrap = canvas.parentElement;
+
+  if (!checklists.length) {
+    if (auditCriarOverviewChart) {
+      auditCriarOverviewChart.destroy();
+      auditCriarOverviewChart = null;
+    }
+    if (wrap) wrap.hidden = true;
+    if (el.auditCriarOverviewChartEmpty) el.auditCriarOverviewChartEmpty.hidden = false;
+    return;
+  }
+  if (wrap) wrap.hidden = false;
+  if (el.auditCriarOverviewChartEmpty) el.auditCriarOverviewChartEmpty.hidden = true;
+
+  const labels = checklists.map((c) => c.checklistCode || "-");
+  const ncData = checklists.map((c) => c.ncCount || 0);
+  const omData = checklists.map((c) => c.omCount || 0);
+
+  if (auditCriarOverviewChart) auditCriarOverviewChart.destroy();
+  auditCriarOverviewChart = new Chart(canvas, {
+    type: "bar",
+    data: {
+      labels,
+      datasets: [
+        { label: "NC", data: ncData, backgroundColor: "#f85149", borderRadius: 4 },
+        { label: "OM", data: omData, backgroundColor: "#d29922", borderRadius: 4 }
+      ]
+    },
+    options: {
+      maintainAspectRatio: false,
+      resizeDelay: 120,
+      plugins: { legend: { position: "bottom", labels: { color: "#e5e7eb" } } },
+      scales: {
+        x: { ticks: { color: "#a1a1aa" }, grid: { display: false } },
+        y: { beginAtZero: true, ticks: { color: "#a1a1aa", precision: 0 }, grid: { color: "rgba(255, 255, 255, 0.06)" } }
+      }
+    }
+  });
+}
+
 function renderAuditCriarLista() {
   if (!el.auditCriarList) return;
+
+  renderAuditCriarOverview();
 
   const term = normalizeText(auditCriarSearchTerm);
   const list = [...auditoriasData]
@@ -2541,7 +2714,15 @@ function openAuditCriarFill(template, existingChecklist) {
 
   if (existingChecklist) {
     (existingChecklist.items || []).forEach((it) => {
-      auditCriarCurrentValues[it.n] = { status: it.status || "", nota: it.nota || "", fotos: it.fotos || [] };
+      auditCriarCurrentValues[it.n] = {
+        status: it.status || "",
+        nota: it.nota || "",
+        fotos: it.fotos || [],
+        setorArea: it.setorArea || "",
+        requisito: it.requisito || "",
+        avaliacaoRisco: it.avaliacaoRisco || "",
+        prazo: it.prazo || ""
+      };
     });
     auditCriarCurrentGrcFields = { ...(existingChecklist.grcFields || {}) };
   }
@@ -2581,9 +2762,38 @@ function renderAuditCriarFillForm(existingChecklist) {
         <h3>${escapeHtml(cat.name)}</h3>
         ${cat.items
           .map((item) => {
-            const current = auditCriarCurrentValues[item.n] || { status: "", nota: "", fotos: [] };
+            const current = auditCriarCurrentValues[item.n] || { status: "", nota: "", fotos: [], setorArea: undefined, requisito: undefined, avaliacaoRisco: "", prazo: "" };
             const currentFotos = current.fotos || [];
             const itemIsFinding = ["", ...auditChecklistFindingStatuses(template.kind)].includes(current.status);
+            const defaultSetorArea = [template.ncDept, cat.name].filter(Boolean).join(" / ");
+            const riscoOptions = ["Baixa", "Média", "Alta", "Extrema"];
+            const findingFieldsTopHtml = `
+              <div class="audit-nc-grid audit-criar-item-finding-fields" ${itemIsFinding ? "" : "hidden"}>
+                <label class="edit-field audit-field-wide">
+                  <span>a) Setor/Área</span>
+                  <input class="input-custom audit-criar-item-setor" value="${escapeHtml(current.setorArea ?? defaultSetorArea)}" ${readOnly ? "disabled" : ""}>
+                </label>
+              </div>`;
+            const findingFieldsBottomHtml = `
+              <div class="audit-nc-grid audit-criar-item-finding-fields" ${itemIsFinding ? "" : "hidden"}>
+                <label class="edit-field audit-field-wide">
+                  <span>c) Requisito</span>
+                  <textarea class="input-custom audit-criar-item-requisito" rows="2" ${readOnly ? "disabled" : ""}>${escapeHtml(current.requisito ?? item.text)}</textarea>
+                </label>
+                <label class="edit-field">
+                  <span>d) Avaliação de Risco</span>
+                  <select class="input-custom audit-criar-item-risco" ${readOnly ? "disabled" : ""}>
+                    <option value="">Selecione...</option>
+                    ${riscoOptions
+                      .map((opt) => `<option value="${opt}" ${current.avaliacaoRisco === opt ? "selected" : ""}>${opt}</option>`)
+                      .join("")}
+                  </select>
+                </label>
+                <label class="edit-field">
+                  <span>e) Prazo</span>
+                  <input type="date" class="input-custom audit-criar-item-prazo" value="${escapeHtml(current.prazo || "")}" ${readOnly ? "disabled" : ""}>
+                </label>
+              </div>`;
             const showPhotosBlock = !readOnly || currentFotos.length > 0;
             const photosHtml = showPhotosBlock
               ? `
@@ -2622,8 +2832,13 @@ function renderAuditCriarFillForm(existingChecklist) {
                   )
                   .join("")}
               </div>
-              <textarea class="input-custom audit-criar-item-nota" placeholder="Observação / evidência (obrigatório para ${auditChecklistFindingStatuses(template.kind).join(" e ")})"
-                ${itemIsFinding ? "" : "hidden"} ${readOnly ? "disabled" : ""}>${escapeHtml(current.nota || "")}</textarea>
+              ${findingFieldsTopHtml}
+              <label class="edit-field audit-field-wide audit-criar-item-nota-label" ${itemIsFinding ? "" : "hidden"}>
+                <span>b) Evidência Objetiva</span>
+                <textarea class="input-custom audit-criar-item-nota" placeholder="Descreva a evidência objetiva encontrada (obrigatório para ${auditChecklistFindingStatuses(template.kind).join(" e ")})"
+                  ${readOnly ? "disabled" : ""}>${escapeHtml(current.nota || "")}</textarea>
+              </label>
+              ${findingFieldsBottomHtml}
               ${photosHtml}
             </div>`;
           })
@@ -2689,10 +2904,16 @@ function renderAuditCriarFillForm(existingChecklist) {
   el.auditCriarFillContainer.querySelectorAll(".audit-criar-item").forEach((itemEl) => {
     const n = Number(itemEl.dataset.itemN);
     const notaEl = itemEl.querySelector(".audit-criar-item-nota");
+    const notaLabelEl = itemEl.querySelector(".audit-criar-item-nota-label");
+    const findingFieldsEls = itemEl.querySelectorAll(".audit-criar-item-finding-fields");
     const photosBlockEl = itemEl.querySelector(".audit-criar-item-photos");
     const photoInputEl = itemEl.querySelector(".audit-criar-item-photo-input");
     const photoGridEl = itemEl.querySelector("[data-item-photo-grid]");
     const photoMsgEl = itemEl.querySelector(".audit-criar-item-photo-message");
+    const setorEl = itemEl.querySelector(".audit-criar-item-setor");
+    const requisitoEl = itemEl.querySelector(".audit-criar-item-requisito");
+    const riscoEl = itemEl.querySelector(".audit-criar-item-risco");
+    const prazoEl = itemEl.querySelector(".audit-criar-item-prazo");
 
     const renderItemPhotoGrid = () => {
       if (!photoGridEl) return;
@@ -2748,13 +2969,36 @@ function renderAuditCriarFillForm(existingChecklist) {
         itemEl.querySelectorAll(".audit-criar-status-btn").forEach((b) => b.classList.toggle("active", b === btn));
         auditCriarCurrentValues[n] = { ...(auditCriarCurrentValues[n] || {}), status: value };
         const needsNota = auditChecklistFindingStatuses(template.kind).includes(value);
-        if (notaEl) notaEl.hidden = !needsNota;
+        if (notaLabelEl) notaLabelEl.hidden = !needsNota;
+        findingFieldsEls.forEach((fieldEl) => {
+          fieldEl.hidden = !needsNota;
+        });
         if (photosBlockEl) photosBlockEl.hidden = !needsNota;
       });
     });
     if (notaEl) {
       notaEl.addEventListener("input", () => {
         auditCriarCurrentValues[n] = { ...(auditCriarCurrentValues[n] || {}), nota: notaEl.value };
+      });
+    }
+    if (setorEl) {
+      setorEl.addEventListener("input", () => {
+        auditCriarCurrentValues[n] = { ...(auditCriarCurrentValues[n] || {}), setorArea: setorEl.value };
+      });
+    }
+    if (requisitoEl) {
+      requisitoEl.addEventListener("input", () => {
+        auditCriarCurrentValues[n] = { ...(auditCriarCurrentValues[n] || {}), requisito: requisitoEl.value };
+      });
+    }
+    if (riscoEl) {
+      riscoEl.addEventListener("change", () => {
+        auditCriarCurrentValues[n] = { ...(auditCriarCurrentValues[n] || {}), avaliacaoRisco: riscoEl.value };
+      });
+    }
+    if (prazoEl) {
+      prazoEl.addEventListener("input", () => {
+        auditCriarCurrentValues[n] = { ...(auditCriarCurrentValues[n] || {}), prazo: prazoEl.value };
       });
     }
   });
@@ -2815,7 +3059,11 @@ async function handleAuditCriarFillSubmit(event) {
       descricao: item.text,
       status: auditCriarCurrentValues[item.n].status,
       nota: auditCriarCurrentValues[item.n].nota || "",
-      fotos: auditCriarCurrentValues[item.n].fotos || []
+      fotos: auditCriarCurrentValues[item.n].fotos || [],
+      setorArea: auditCriarCurrentValues[item.n].setorArea || "",
+      requisito: auditCriarCurrentValues[item.n].requisito || "",
+      avaliacaoRisco: auditCriarCurrentValues[item.n].avaliacaoRisco || "",
+      prazo: auditCriarCurrentValues[item.n].prazo || ""
     }));
 
     const checklistPayload = {
@@ -2858,14 +3106,15 @@ async function handleAuditCriarFillSubmit(event) {
         auditNumber: auditoria.auditNumber || "",
         type,
         ncNumber,
-        requisito: item.text,
+        requisito: value.requisito || item.text,
+        setorArea: value.setorArea || "",
         fotos: value.fotos || [],
         sourceChecklistCode: template.code,
         sourceItemN: item.n,
         base: auditoria.base || "",
         status: "Open",
         step: "Open",
-        riskAnalysis: "",
+        riskAnalysis: value.avaliacaoRisco || "",
         recurrentNc: "No",
         needsInvestment: "No",
         ncDate: auditoria.dateStart || "",
@@ -2876,7 +3125,7 @@ async function handleAuditCriarFillSubmit(event) {
         rootCauseDescription: "",
         rootCauseCode: "",
         pacResponsibleName: "",
-        deadline: "",
+        deadline: value.prazo || "",
         extension1: "",
         extension2: "",
         ncClosureDate: "",

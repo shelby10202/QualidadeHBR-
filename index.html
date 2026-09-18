@@ -773,6 +773,33 @@
       </div>
 
       <div id="auditCriarStepLista">
+        <div id="auditCriarOverview" class="audit-criar-overview" hidden>
+          <div class="audit-criar-overview-head">
+            <h2>Resumo das Auditorias</h2>
+            <span id="auditCriarOverviewPeriod" class="audit-criar-overview-period"></span>
+          </div>
+          <div class="audit-criar-overview-body">
+            <nav id="auditCriarOverviewNav" class="audit-criar-overview-nav" aria-label="Lista de auditorias"></nav>
+            <div class="audit-criar-overview-main">
+              <div id="auditCriarOverviewStats" class="audit-criar-overview-stats"></div>
+              <div class="audit-criar-overview-cards">
+                <div class="audit-criar-overview-card">
+                  <h3>Resumo</h3>
+                  <p id="auditCriarOverviewSummary" class="audit-criar-overview-summary-text"></p>
+                </div>
+                <div class="audit-criar-overview-card">
+                  <h3>Achados por Checklist</h3>
+                  <div class="audit-criar-overview-chart-wrap">
+                    <canvas id="auditCriarOverviewChart"></canvas>
+                  </div>
+                  <p id="auditCriarOverviewChartEmpty" class="audit-photo-empty" hidden>Nenhum checklist preenchido ainda nesta auditoria.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <p id="auditCriarOverviewEmpty" class="empty-state" hidden>Crie sua primeira auditoria para ver o resumo aqui.</p>
+
         <div class="gallery-toolbar">
           <div class="search-box">
             <input id="auditCriarSearch" type="search" placeholder="Buscar por N° da auditoria, base, tipo...">
