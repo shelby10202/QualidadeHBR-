@@ -347,7 +347,25 @@ button {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 0 6px;
+  width: 100%;
+  padding: 4px 6px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.sidebar-brand:hover {
+  background: #161b22;
+}
+
+.sidebar-brand:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .brand-logo {
@@ -400,7 +418,7 @@ button {
 .gh-nav-item {
   width: 100%;
   min-width: 0;
-  height: 32px;
+  min-height: 44px;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -416,6 +434,11 @@ button {
   text-decoration: none;
   user-select: none;
   transition: background-color 0.15s, color 0.15s;
+}
+
+.gh-nav-item:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
 }
 
 .gh-nav-item .icon {

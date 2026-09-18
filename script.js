@@ -8287,8 +8287,14 @@ window.showTab = function (tab) {
   document.querySelectorAll(".tab").forEach((t) => t.classList.remove("active"));
   document.getElementById(tab)?.classList.add("active");
   document.querySelectorAll("[data-tab-target]").forEach((button) => {
-    button.classList.toggle("active", button.dataset.tabTarget === tab);
-    button.classList.toggle("is-selected", button.dataset.tabTarget === tab);
+    const isCurrent = button.dataset.tabTarget === tab;
+    button.classList.toggle("active", isCurrent);
+    button.classList.toggle("is-selected", isCurrent);
+    if (isCurrent) {
+      button.setAttribute("aria-current", "page");
+    } else {
+      button.removeAttribute("aria-current");
+    }
   });
   if (tab === "dashboard") gerarGrafico();
   if (tab === "historico") renderHistorico();
