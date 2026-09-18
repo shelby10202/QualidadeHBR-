@@ -125,6 +125,25 @@
           Notificações de AD
         </button>
       </div>
+
+      <div class="gh-nav-group">
+        <p class="gh-nav-label">Auditoria</p>
+        <button type="button" class="gh-nav-item" data-tab-target="auditoriaDashboard" onclick="showTab('auditoriaDashboard')">
+          <svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="20" x2="18" y2="10"></line>
+            <line x1="12" y1="20" x2="12" y2="4"></line>
+            <line x1="6" y1="20" x2="6" y2="14"></line>
+          </svg>
+          Dashboard Auditoria
+        </button>
+        <button type="button" class="gh-nav-item" data-tab-target="auditoriaOperacao" onclick="showTab('auditoriaOperacao')">
+          <svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M9 11l3 3L22 4"></path>
+            <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
+          </svg>
+          Operação Auditoria
+        </button>
+      </div>
     </nav>
 
     <div class="sidebar-user">
@@ -724,7 +743,316 @@
         </div>
       </div>
     </section>
+
+    <section id="auditoriaDashboard" class="tab">
+      <div class="dashboard-page">
+        <div class="dashboard-topbar">
+          <div>
+            <p class="eyebrow">Auditoria</p>
+            <h1>Dashboard de não conformidades</h1>
+          </div>
+          <div class="dashboard-total">
+            <span id="audit_metric_total">0</span>
+            <small>não conformidades</small>
+          </div>
+        </div>
+
+        <div class="dashboard-kpis audit-kpis">
+          <article class="metric-card metric-total">
+            <div class="metric-icon">T</div>
+            <div>
+              <span>Total</span>
+              <strong id="audit_metric_total_card">0</strong>
+            </div>
+          </article>
+          <article class="metric-card metric-pendentes">
+            <div class="metric-icon">A</div>
+            <div>
+              <span>Em aberto</span>
+              <strong id="audit_metric_abertas">0</strong>
+            </div>
+          </article>
+          <article class="metric-card metric-prefixos">
+            <div class="metric-icon">!</div>
+            <div>
+              <span>Atrasadas</span>
+              <strong id="audit_metric_atrasadas">0</strong>
+            </div>
+          </article>
+          <article class="metric-card metric-saidas">
+            <div class="metric-icon">C</div>
+            <div>
+              <span>Concluídas</span>
+              <strong id="audit_metric_concluidas">0</strong>
+            </div>
+          </article>
+          <article class="metric-card metric-total">
+            <div class="metric-icon">R</div>
+            <div>
+              <span>Reincidentes</span>
+              <strong id="audit_metric_reincidentes">0</strong>
+            </div>
+          </article>
+          <article class="metric-card metric-pendentes">
+            <div class="metric-icon">$</div>
+            <div>
+              <span>Precisam de investimento</span>
+              <strong id="audit_metric_investimento">0</strong>
+            </div>
+          </article>
+        </div>
+
+        <div class="dashboard-grid">
+          <section class="dashboard-panel chart-panel">
+            <div class="panel-heading">
+              <h3>Não conformidades por ano</h3>
+              <span id="audit_year_range">2022 - 2026</span>
+            </div>
+            <div class="chart-frame">
+              <canvas id="auditYearChart"></canvas>
+            </div>
+          </section>
+          <section class="dashboard-panel donut-panel">
+            <div class="panel-heading">
+              <h3>Status</h3>
+              <span>aberto x atrasado x concluído</span>
+            </div>
+            <div class="donut-frame">
+              <canvas id="auditStatusChart"></canvas>
+            </div>
+          </section>
+        </div>
+
+        <div class="dashboard-grid dashboard-grid-secondary">
+          <section class="dashboard-panel prefix-panel">
+            <div class="panel-heading">
+              <h3>Ranking por setor</h3>
+              <span>mais não conformidades</span>
+            </div>
+            <div id="audit_ranking_setor" class="prefix-ranking"></div>
+          </section>
+          <section class="dashboard-panel fleet-panel">
+            <div class="panel-heading">
+              <h3>Ranking por base HBR</h3>
+              <span>mais não conformidades</span>
+            </div>
+            <div id="audit_ranking_base" class="prefix-ranking"></div>
+          </section>
+        </div>
+
+        <div class="dashboard-grid dashboard-grid-secondary">
+          <section class="dashboard-panel prefix-panel">
+            <div class="panel-heading">
+              <h3>Ranking por causa raiz</h3>
+              <span>código mais recorrente</span>
+            </div>
+            <div id="audit_ranking_causa" class="prefix-ranking"></div>
+          </section>
+          <section class="dashboard-panel chart-panel">
+            <div class="panel-heading">
+              <h3>Nível de risco</h3>
+              <span>distribuição</span>
+            </div>
+            <div class="chart-frame">
+              <canvas id="auditRiskChart"></canvas>
+            </div>
+          </section>
+        </div>
+      </div>
+    </section>
+
+    <section id="auditoriaOperacao" class="tab">
+      <div class="page-heading">
+        <div>
+          <p class="eyebrow">Auditoria</p>
+          <h1>Operação - Não conformidades</h1>
+          <p class="page-subtitle">Cadastro e acompanhamento dos itens do Plano de Ação Corretiva (PAC).</p>
+        </div>
+        <div class="total-pill">
+          <span id="audit_op_count">0</span>
+          <small>registros</small>
+        </div>
+      </div>
+
+      <div class="gallery-toolbar">
+        <div class="chip-row" aria-label="Filtros rápidos">
+          <button type="button" class="chip active" data-audit-filter="all">Todos</button>
+          <button type="button" class="chip" data-audit-filter="Open">Abertas</button>
+          <button type="button" class="chip" data-audit-filter="Late">Atrasadas</button>
+          <button type="button" class="chip" data-audit-filter="Done">Concluídas</button>
+        </div>
+
+        <div class="search-box">
+          <input id="auditSearch" type="search" placeholder="Buscar NC, descrição, base, setor...">
+        </div>
+
+        <button type="button" id="auditNewBtn" class="modal-action audit-new-btn">Nova não conformidade</button>
+      </div>
+
+      <div class="audit-table-wrap">
+        <table class="audit-table">
+          <thead>
+            <tr>
+              <th>NC</th>
+              <th>Descrição</th>
+              <th>Base</th>
+              <th>Setor</th>
+              <th>Status</th>
+              <th>Risco</th>
+              <th>Prazo</th>
+              <th>Responsável PAC</th>
+            </tr>
+          </thead>
+          <tbody id="audit_table_body"></tbody>
+        </table>
+      </div>
+
+      <div id="audit_empty_state" class="empty-state" hidden>
+        Nenhuma não conformidade encontrada.
+      </div>
+    </section>
   </main>
+
+  <div id="auditNcModal" class="edit-modal" hidden>
+    <form id="auditNcForm" class="notification audit-nc-form">
+      <div class="notiglow"></div>
+      <div class="notiborderglow"></div>
+
+      <button type="button" id="auditNcCloseBtn" class="modal-close" aria-label="Fechar formulário">x</button>
+
+      <div class="notititle" id="auditNcModalTitle">Nova não conformidade</div>
+
+      <div class="audit-nc-grid">
+        <label class="edit-field">
+          <span>Descrição da não conformidade</span>
+          <textarea id="auditNcDescription" class="input-custom" rows="2"></textarea>
+        </label>
+
+        <label class="edit-field">
+          <span>Tipo de auditoria</span>
+          <select id="auditNcAuditType" class="input-custom"></select>
+        </label>
+
+        <label class="edit-field">
+          <span>Cliente</span>
+          <select id="auditNcClient" class="input-custom"></select>
+        </label>
+
+        <label class="edit-field">
+          <span>Número da auditoria</span>
+          <input id="auditNcAuditNumber" class="input-custom" placeholder="Ex: 04/HBR/2026">
+        </label>
+
+        <label class="edit-field">
+          <span>Tipo</span>
+          <select id="auditNcType" class="input-custom"></select>
+        </label>
+
+        <label class="edit-field">
+          <span>Número da NC</span>
+          <input id="auditNcNumber" class="input-custom" placeholder="Ex: NC001">
+        </label>
+
+        <label class="edit-field">
+          <span>Base HBR</span>
+          <select id="auditNcBase" class="input-custom"></select>
+        </label>
+
+        <label class="edit-field">
+          <span>Status</span>
+          <select id="auditNcStatus" class="input-custom"></select>
+        </label>
+
+        <label class="edit-field">
+          <span>Etapa (Step)</span>
+          <select id="auditNcStep" class="input-custom"></select>
+        </label>
+
+        <label class="edit-field">
+          <span>Análise de risco</span>
+          <select id="auditNcRisk" class="input-custom"></select>
+        </label>
+
+        <label class="edit-field">
+          <span>NC reincidente?</span>
+          <select id="auditNcRecurrent" class="input-custom"></select>
+        </label>
+
+        <label class="edit-field">
+          <span>Precisa de investimento?</span>
+          <select id="auditNcInvestment" class="input-custom"></select>
+        </label>
+
+        <label class="edit-field">
+          <span>Data da NC</span>
+          <input id="auditNcDate" class="input-custom" type="date">
+        </label>
+
+        <label class="edit-field">
+          <span>Departamento da NC</span>
+          <select id="auditNcDept" class="input-custom"></select>
+        </label>
+
+        <label class="edit-field">
+          <span>Setor da NC</span>
+          <select id="auditNcSector" class="input-custom"></select>
+        </label>
+
+        <label class="edit-field">
+          <span>Setor responsável</span>
+          <select id="auditNcResponsableSector" class="input-custom"></select>
+        </label>
+
+        <label class="edit-field audit-field-wide">
+          <span>Descrição da causa raiz</span>
+          <textarea id="auditNcRootCauseDescription" class="input-custom" rows="2"></textarea>
+        </label>
+
+        <label class="edit-field">
+          <span>Código da causa raiz</span>
+          <select id="auditNcRootCauseCode" class="input-custom"></select>
+        </label>
+
+        <label class="edit-field">
+          <span>Responsável PAC</span>
+          <select id="auditNcResponsibleName" class="input-custom"></select>
+        </label>
+
+        <label class="edit-field">
+          <span>Prazo (Deadline)</span>
+          <input id="auditNcDeadline" class="input-custom" type="date">
+        </label>
+
+        <label class="edit-field">
+          <span>Extensão 1</span>
+          <input id="auditNcExtension1" class="input-custom" type="date">
+        </label>
+
+        <label class="edit-field">
+          <span>Extensão 2</span>
+          <input id="auditNcExtension2" class="input-custom" type="date">
+        </label>
+
+        <label class="edit-field">
+          <span>Data de encerramento</span>
+          <input id="auditNcClosureDate" class="input-custom" type="date">
+        </label>
+
+        <label class="edit-field audit-field-wide">
+          <span>Observações</span>
+          <textarea id="auditNcHighlight" class="input-custom" rows="2"></textarea>
+        </label>
+      </div>
+
+      <p id="auditNcMessage" class="edit-message"></p>
+
+      <div class="edit-actions">
+        <button type="button" id="auditNcDeleteBtn" class="modal-action secondary audit-delete-btn" hidden>Excluir</button>
+        <button type="button" id="auditNcCancelBtn" class="modal-action secondary">Cancelar</button>
+        <button type="submit" id="auditNcSaveBtn" class="modal-action">Salvar</button>
+      </div>
+    </form>
+  </div>
 </div>
 
 <div id="editModal" class="edit-modal" hidden>
@@ -823,6 +1151,7 @@
 </div>
 
 <script src="quarantine-data.js"></script>
+<script src="audit-data.js"></script>
 <script type="module">
   const loginMessage = document.getElementById("loginMessage");
 
