@@ -708,6 +708,7 @@ const el = {
   auditNcCancelBtn: document.getElementById("auditNcCancelBtn"),
   auditNcSaveBtn: document.getElementById("auditNcSaveBtn"),
   auditNcDeleteBtn: document.getElementById("auditNcDeleteBtn"),
+  auditNcEmitBtn: document.getElementById("auditNcEmitBtn"),
   auditNcMessage: document.getElementById("auditNcMessage"),
   auditNcDescription: document.getElementById("auditNcDescription"),
   auditNcAuditType: document.getElementById("auditNcAuditType"),
@@ -1151,6 +1152,89 @@ function formatAuditDate(value) {
   return `${d}/${m}/${y}`;
 }
 
+function formatAuditDateForDoc(value) {
+  const formatted = formatAuditDate(value);
+  return formatted === "-" ? "" : formatted;
+}
+
+const FQ071_TEMPLATE_URL = "fq071-template.docx";
+
+function fq071LibsReady() {
+  return typeof window.PizZip !== "undefined" && typeof window.docxtemplater !== "undefined";
+}
+
+function buildFq071Data(item) {
+  const mark = (condition) => (condition ? "☒" : "☐");
+  const typeNorm = normalizeText(item.type || "");
+  const isClosed = item.status === "Done" || Boolean(item.ncClosureDate);
+  const setorArea = [item.ncDept, item.ncSector]
+    .map((v) => (v || "").trim())
+    .filter((v) => v && normalizeText(v) !== "N/A")
+    .join(" / ");
+
+  return {
+    ncDate: formatAuditDateForDoc(item.ncDate),
+    ncNumber: item.ncNumber || "",
+    auditNumber: item.auditNumber || "",
+    setorArea: setorArea || item.ncDept || item.ncSector || "",
+    description: item.description || "",
+    riskAnalysis: item.riskAnalysis || "",
+    deadline: formatAuditDateForDoc(item.deadline),
+    extension1: item.extension1 || "",
+    extension2: item.extension2 || "",
+    rootCauseDescription: item.rootCauseDescription || "",
+    rootCauseCode: item.rootCauseCode || "",
+    pacResponsibleName: item.pacResponsibleName || "",
+    responsableSector: item.responsableSector || "",
+    marcaTipoNC: mark(typeNorm.startsWith("NC")),
+    marcaTipoOM: mark(typeNorm === "OM"),
+    marcaReincidenteSim: mark(item.recurrentNc === "Yes"),
+    marcaReincidenteNao: mark(item.recurrentNc !== "Yes"),
+    marcaEficazSim: "☐",
+    marcaEficazNao: "☐",
+    marcaNcFechada: mark(isClosed),
+    marcaNcAberta: mark(!isClosed)
+  };
+}
+
+async function emitFq071(item, triggerBtn) {
+  if (!item) return;
+
+  if (!fq071LibsReady()) {
+    alert("As bibliotecas de geração de Word ainda não carregaram. Aguarde alguns segundos e tente novamente.");
+    return;
+  }
+
+  if (triggerBtn) triggerBtn.disabled = true;
+  try {
+    const res = await fetch(FQ071_TEMPLATE_URL);
+    if (!res.ok) throw new Error(`HTTP ${res.status} ao buscar ${FQ071_TEMPLATE_URL}`);
+    const buffer = await res.arrayBuffer();
+
+    const zip = new window.PizZip(buffer);
+    const doc = new window.docxtemplater(zip, { paragraphLoop: true, linebreaks: true });
+    doc.render(buildFq071Data(item));
+
+    const blob = doc.toBlob();
+    const url = URL.createObjectURL(blob);
+    const safeNc = String(item.ncNumber || "NC").replace(/[^\w-]+/g, "_");
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `FQ-071_${safeNc}.docx`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
+  } catch (err) {
+    console.error("Erro ao gerar FQ-071:", err);
+    alert(
+      `Não foi possível gerar o FQ-071: "${err?.message || err}". Confira se o arquivo "fq071-template.docx" está na mesma pasta do index.html.`
+    );
+  } finally {
+    if (triggerBtn) triggerBtn.disabled = false;
+  }
+}
+
 function auditStatusToneClass(status) {
   if (status === "Done") return "ok";
   if (status === "Late") return "critical";
@@ -1214,6 +1298,7 @@ function renderAuditOperacao() {
       <td><span class="audit-status-pill ${auditRiskToneClass(item.riskAnalysis)}">${escapeHtml(item.riskAnalysis || "-")}</span></td>
       <td>${formatAuditDate(item.deadline)}</td>
       <td>${escapeHtml(item.pacResponsibleName || "-")}</td>
+      <td><button type="button" class="audit-row-emit-btn" data-emit-id="${escapeHtml(item.id)}" title="Emitir FQ-071 com os dados desta NC">FQ-071</button></td>
     </tr>
   `
     )
@@ -1221,6 +1306,14 @@ function renderAuditOperacao() {
 
   el.auditTableBody.querySelectorAll("[data-audit-id]").forEach((row) => {
     row.addEventListener("click", () => openAuditNcModal(row.dataset.auditId));
+  });
+
+  el.auditTableBody.querySelectorAll("[data-emit-id]").forEach((btn) => {
+    btn.addEventListener("click", (event) => {
+      event.stopPropagation();
+      const record = auditNcData.find((item) => item.id === btn.dataset.emitId);
+      emitFq071(record, btn);
+    });
   });
 }
 
@@ -1269,6 +1362,7 @@ function openAuditNcModal(id) {
     el.auditNcModalTitle.textContent = record ? `Editar ${record.ncNumber || "não conformidade"}` : "Nova não conformidade";
   }
   if (el.auditNcDeleteBtn) el.auditNcDeleteBtn.hidden = !record;
+  if (el.auditNcEmitBtn) el.auditNcEmitBtn.hidden = !record;
   if (el.auditNcMessage) el.auditNcMessage.textContent = "";
   el.auditNcModal.hidden = false;
 }
@@ -1325,6 +1419,12 @@ el.auditNcDeleteBtn?.addEventListener("click", async () => {
   } catch (err) {
     console.error(err);
   }
+});
+
+el.auditNcEmitBtn?.addEventListener("click", () => {
+  if (!auditNcEditingId) return;
+  const record = auditNcData.find((item) => item.id === auditNcEditingId);
+  emitFq071(record, el.auditNcEmitBtn);
 });
 
 el.auditSearch?.addEventListener("input", () => {

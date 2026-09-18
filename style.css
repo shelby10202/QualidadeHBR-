@@ -1841,7 +1841,7 @@ button {
 }
 
 .audit-nc-form .edit-actions {
-  grid-template-columns: auto 1fr 1fr;
+  grid-template-columns: auto auto 1fr 1fr;
   align-items: center;
 }
 
@@ -1855,6 +1855,43 @@ button {
   background: rgba(248, 113, 113, 0.12) !important;
 }
 
+.audit-emit-btn {
+  border-color: rgba(88, 166, 255, 0.4) !important;
+  color: #a5d1ff !important;
+}
+
+.audit-emit-btn:hover {
+  border-color: rgba(88, 166, 255, 0.7) !important;
+  background: rgba(88, 166, 255, 0.12) !important;
+}
+
+.audit-emit-btn:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.audit-row-emit-btn {
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--panel-2);
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 8px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.audit-row-emit-btn:hover {
+  border-color: var(--accent);
+  background: rgba(88, 166, 255, 0.12);
+}
+
+.audit-row-emit-btn:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
 @media (max-width: 900px) {
   .audit-kpis {
     grid-template-columns: repeat(2, minmax(140px, 1fr));
@@ -1866,6 +1903,10 @@ button {
 
   .audit-nc-form .edit-actions {
     grid-template-columns: 1fr;
+  }
+
+  .audit-table-wrap {
+    overflow-x: auto;
   }
 }
 

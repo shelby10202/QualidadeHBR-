@@ -10,6 +10,8 @@
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/pizzip@3.2.0/dist/pizzip.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/docxtemplater@3.70.0/build/docxtemplater.min.js"></script>
 </head>
 
 <body>
@@ -903,6 +905,7 @@
               <th>Risco</th>
               <th>Prazo</th>
               <th>Responsável PAC</th>
+              <th>Ações</th>
             </tr>
           </thead>
           <tbody id="audit_table_body"></tbody>
@@ -1050,6 +1053,7 @@
 
       <div class="edit-actions">
         <button type="button" id="auditNcDeleteBtn" class="modal-action secondary audit-delete-btn" hidden>Excluir</button>
+        <button type="button" id="auditNcEmitBtn" class="modal-action secondary audit-emit-btn" hidden>Emitir FQ-071</button>
         <button type="button" id="auditNcCancelBtn" class="modal-action secondary">Cancelar</button>
         <button type="submit" id="auditNcSaveBtn" class="modal-action">Salvar</button>
       </div>
