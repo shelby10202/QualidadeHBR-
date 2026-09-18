@@ -2012,13 +2012,40 @@ function renderAuditCriarLista() {
         <strong>${escapeHtml(auditoria.auditNumber || "Sem número")}</strong>
         <span>${escapeHtml(auditoria.base || "-")} &bull; ${escapeHtml(auditoria.auditType || "-")} &bull; ${formatAuditDate(auditoria.date)}</span>
       </div>
-      <span class="audit-status-pill ${done >= AUDIT_CHECKLIST_TEMPLATES.length ? "ok" : done > 0 ? "warning" : "empty"}">
-        ${done}/${AUDIT_CHECKLIST_TEMPLATES.length} checklists
-      </span>
+      <div class="audit-criar-card-side">
+        <span class="audit-status-pill ${done >= AUDIT_CHECKLIST_TEMPLATES.length ? "ok" : done > 0 ? "warning" : "empty"}">
+          ${done}/${AUDIT_CHECKLIST_TEMPLATES.length} checklists
+        </span>
+        <button type="button" class="audit-criar-delete-btn" title="Excluir auditoria">Excluir</button>
+      </div>
     `;
     card.addEventListener("click", () => openAuditCriarPicker(auditoria));
+    card.querySelector(".audit-criar-delete-btn")?.addEventListener("click", (event) => {
+      event.stopPropagation();
+      deleteAuditoria(auditoria);
+    });
     el.auditCriarList.appendChild(card);
   });
+}
+
+async function deleteAuditoria(auditoria) {
+  const relatedChecklists = auditoriaChecklistsFor(auditoria.id);
+  const warn = relatedChecklists.length
+    ? `Esta auditoria tem ${relatedChecklists.length} checklist(s) preenchido(s), que também serão excluídos. As não conformidades já geradas na Operação de Auditoria NÃO serão apagadas. `
+    : "";
+  const confirmed = confirm(`${warn}Tem certeza que deseja excluir a auditoria "${auditoria.auditNumber || "Sem número"}"? Esta ação não pode ser desfeita.`);
+  if (!confirmed) return;
+
+  try {
+    await Promise.all(relatedChecklists.map((c) => deleteDoc(doc(db, "auditoria_checklists", c.id))));
+    await deleteDoc(doc(db, "auditorias", auditoria.id));
+    auditoriaChecklistsData = auditoriaChecklistsData.filter((c) => c.auditoriaId !== auditoria.id);
+    auditoriasData = auditoriasData.filter((a) => a.id !== auditoria.id);
+    renderAuditCriarLista();
+  } catch (err) {
+    console.error("Erro ao excluir auditoria.", err);
+    alert(`Não foi possível excluir a auditoria: "${err?.message || err}".`);
+  }
 }
 
 function openAuditCriarForm() {
@@ -2172,6 +2199,11 @@ function renderAuditCriarFillForm(existingChecklist) {
       </div>
       ${existingChecklist ? `<span class="audit-status-pill ok">Concluído &bull; índice ${existingChecklist.indiceConformidade ?? "-"}%</span>` : ""}
     </div>
+    ${
+      existingChecklist
+        ? `<div class="audit-criar-readonly-banner">Este checklist já foi concluído para esta auditoria e está em modo somente leitura. Cada checklist só pode ser preenchido uma vez por auditoria.</div>`
+        : ""
+    }
     <form id="auditCriarFillForm" class="audit-nc-form audit-criar-fill-form">
       ${grcFieldsHtml}
       <div class="audit-criar-items">${itemsHtml}</div>

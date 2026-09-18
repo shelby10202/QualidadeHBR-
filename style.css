@@ -26,6 +26,35 @@ body {
   background: var(--bg);
 }
 
+/* Scrollbars temáticas (evita a barra clara padrão do navegador sobre o tema escuro) */
+html {
+  scrollbar-width: thin;
+  scrollbar-color: var(--panel-3) var(--panel);
+}
+
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+*::-webkit-scrollbar-track {
+  background: var(--panel);
+}
+
+*::-webkit-scrollbar-thumb {
+  border: 2px solid var(--panel);
+  border-radius: 999px;
+  background: var(--panel-3);
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--muted);
+}
+
+*::-webkit-scrollbar-corner {
+  background: var(--panel);
+}
+
 button,
 input,
 select {
@@ -605,10 +634,21 @@ button {
 
 .gallery-toolbar {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   align-items: center;
-  gap: 16px;
+  gap: 12px 16px;
   margin-bottom: 14px;
+}
+
+.gallery-toolbar > .chip-row {
+  flex: 1 1 auto;
+}
+
+.gallery-toolbar > .search-box,
+.gallery-toolbar > .audit-number-filter,
+.gallery-toolbar > .audit-new-btn {
+  flex: 0 0 auto;
 }
 
 .chip-row {
@@ -4819,6 +4859,30 @@ button {
   font-size: 12px;
 }
 
+.audit-criar-card-side {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: none;
+}
+
+.audit-criar-delete-btn {
+  min-height: 28px;
+  border: 1px solid rgba(248, 113, 113, 0.4);
+  border-radius: 6px;
+  padding: 0 9px;
+  color: #fecaca;
+  background: var(--panel-2);
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.audit-criar-delete-btn:hover {
+  border-color: rgba(248, 113, 113, 0.7);
+  background: rgba(248, 113, 113, 0.12);
+}
+
 .audit-criar-form {
   margin-top: 4px;
   max-width: none;
@@ -4869,6 +4933,16 @@ button {
 
 .audit-criar-fill-form {
   width: min(880px, 100%);
+}
+
+.audit-criar-readonly-banner {
+  margin: 0 0 16px;
+  padding: 10px 14px;
+  border: 1px solid rgba(88, 166, 255, 0.35);
+  border-radius: 8px;
+  color: #bae6fd;
+  background: rgba(88, 166, 255, 0.1);
+  font-size: 13px;
 }
 
 .audit-criar-grc-fields {
