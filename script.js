@@ -1,5 +1,5 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import { getFirestore, collection, addDoc, getDocs, deleteDoc, doc, updateDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { getFirestore, collection, addDoc, getDocs, deleteDoc, doc, updateDoc, setDoc, writeBatch } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
 const firebaseConfig = {
@@ -64,6 +64,15 @@ const QUARANTINE_SOURCE = window.QUARANTINE_SOURCE || {
   summaryByLine: {},
   totalItens: 0,
   totalSaidas: 0
+};
+
+// Carga inicial (851 não conformidades da planilha CONTROLE_DE_PAC.xlsx) usada só uma
+// vez para semear o Firestore, e as listas de opções dos <select> do formulário.
+const AUDIT_NC_SEED = window.AUDIT_NC_SEED || [];
+const AUDIT_NC_OPTIONS = window.AUDIT_NC_OPTIONS || {
+  clients: [], type: [], bases: [], status: [], step: [], riskAnalysis: [],
+  recurrentInvestment: [], ncDept: [], ncSector: [], responsableSector: [],
+  rootCauseCode: [], pacResponsibleName: [], auditType: []
 };
 
 // Cada linha da planilha aponta para a imagem solicitada para o dashboard e cards.
@@ -669,7 +678,61 @@ const el = {
   publicationLineWidth: document.getElementById("publicationLineWidth"),
   publicationLabelsToggle: document.getElementById("publicationLabelsToggle"),
   publicationAnimateBtn: document.getElementById("publicationAnimateBtn"),
-  workspace: document.querySelector(".workspace")
+  workspace: document.querySelector(".workspace"),
+
+  auditDashboardError: document.getElementById("audit_dashboard_error"),
+  auditOpError: document.getElementById("audit_op_error"),
+  auditMetricTotal: document.getElementById("audit_metric_total"),
+  auditMetricTotalCard: document.getElementById("audit_metric_total_card"),
+  auditMetricAbertas: document.getElementById("audit_metric_abertas"),
+  auditMetricAtrasadas: document.getElementById("audit_metric_atrasadas"),
+  auditMetricConcluidas: document.getElementById("audit_metric_concluidas"),
+  auditMetricReincidentes: document.getElementById("audit_metric_reincidentes"),
+  auditMetricInvestimento: document.getElementById("audit_metric_investimento"),
+  auditYearRange: document.getElementById("audit_year_range"),
+  auditRankingSetor: document.getElementById("audit_ranking_setor"),
+  auditRankingBase: document.getElementById("audit_ranking_base"),
+  auditRankingCausa: document.getElementById("audit_ranking_causa"),
+
+  auditOpCount: document.getElementById("audit_op_count"),
+  auditSearch: document.getElementById("auditSearch"),
+  auditFilterChips: document.querySelectorAll("[data-audit-filter]"),
+  auditNewBtn: document.getElementById("auditNewBtn"),
+  auditTableBody: document.getElementById("audit_table_body"),
+  auditEmptyState: document.getElementById("audit_empty_state"),
+
+  auditNcModal: document.getElementById("auditNcModal"),
+  auditNcForm: document.getElementById("auditNcForm"),
+  auditNcModalTitle: document.getElementById("auditNcModalTitle"),
+  auditNcCloseBtn: document.getElementById("auditNcCloseBtn"),
+  auditNcCancelBtn: document.getElementById("auditNcCancelBtn"),
+  auditNcSaveBtn: document.getElementById("auditNcSaveBtn"),
+  auditNcDeleteBtn: document.getElementById("auditNcDeleteBtn"),
+  auditNcMessage: document.getElementById("auditNcMessage"),
+  auditNcDescription: document.getElementById("auditNcDescription"),
+  auditNcAuditType: document.getElementById("auditNcAuditType"),
+  auditNcClient: document.getElementById("auditNcClient"),
+  auditNcAuditNumber: document.getElementById("auditNcAuditNumber"),
+  auditNcType: document.getElementById("auditNcType"),
+  auditNcNumber: document.getElementById("auditNcNumber"),
+  auditNcBase: document.getElementById("auditNcBase"),
+  auditNcStatus: document.getElementById("auditNcStatus"),
+  auditNcStep: document.getElementById("auditNcStep"),
+  auditNcRisk: document.getElementById("auditNcRisk"),
+  auditNcRecurrent: document.getElementById("auditNcRecurrent"),
+  auditNcInvestment: document.getElementById("auditNcInvestment"),
+  auditNcDate: document.getElementById("auditNcDate"),
+  auditNcDept: document.getElementById("auditNcDept"),
+  auditNcSector: document.getElementById("auditNcSector"),
+  auditNcResponsableSector: document.getElementById("auditNcResponsableSector"),
+  auditNcRootCauseDescription: document.getElementById("auditNcRootCauseDescription"),
+  auditNcRootCauseCode: document.getElementById("auditNcRootCauseCode"),
+  auditNcResponsibleName: document.getElementById("auditNcResponsibleName"),
+  auditNcDeadline: document.getElementById("auditNcDeadline"),
+  auditNcExtension1: document.getElementById("auditNcExtension1"),
+  auditNcExtension2: document.getElementById("auditNcExtension2"),
+  auditNcClosureDate: document.getElementById("auditNcClosureDate"),
+  auditNcHighlight: document.getElementById("auditNcHighlight")
 };
 
 let data = [];
@@ -712,6 +775,16 @@ let areaBuilderComponents = {
   charts: []
 };
 let areaBuilderPendingPointer = null;
+
+let auditNcData = [];
+let auditNcFilter = "all";
+let auditNcSearchTerm = "";
+let auditNcEditingId = null;
+let auditNcLoaded = false;
+let auditNcLoadError = "";
+let auditChart = null;
+let auditStatusChart = null;
+let auditRiskChart = null;
 
 function prepareStaticShells() {
   // O dashboard antigo e parcialmente estatico e substituido por uma estrutura unica.
@@ -966,6 +1039,468 @@ async function carregarHistorico() {
   } catch {
     historicoGlobal = [];
   }
+}
+
+// ===== Auditoria (Plano de Ação Corretiva / não conformidades) =====
+// Carregada sob demanda (só quando a aba de Auditoria é aberta pela primeira vez),
+// para não pesar o login com 851 leituras que a maioria das sessões não vai usar.
+// Na primeira vez que a coleção "nao_conformidades" estiver vazia, semeia o Firestore
+// com os dados históricos da planilha (AUDIT_NC_SEED); depois disso tudo passa a vir
+// só do Firestore, inclusive os itens antigos.
+async function carregarAuditoriaNc() {
+  if (auditNcLoaded) return;
+  auditNcLoadError = "";
+
+  if (!AUDIT_NC_SEED.length) {
+    // window.AUDIT_NC_SEED não chegou a existir - o arquivo audit-data.js não foi
+    // encontrado (nome/local errado) ou não terminou de carregar antes deste módulo.
+    console.warn("AUDIT_NC_SEED está vazio: audit-data.js não carregou ou não tem dados.");
+  }
+
+  try {
+    const snap = await getDocs(collection(db, "nao_conformidades"));
+    if (snap.empty && AUDIT_NC_SEED.length) {
+      await seedAuditNc();
+      const reseeded = await getDocs(collection(db, "nao_conformidades"));
+      auditNcData = reseeded.docs.map((d) => ({ id: d.id, ...d.data() }));
+    } else {
+      auditNcData = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    }
+
+    if (!auditNcData.length && !AUDIT_NC_SEED.length) {
+      auditNcLoadError =
+        "O arquivo audit-data.js não carregou (window.AUDIT_NC_SEED está vazio). Confira se o arquivo está na mesma pasta do index.html, com o nome exato \"audit-data.js\" (tudo minúsculo), e se o index.html tem a linha <script src=\"audit-data.js\"></script> antes do script.js.";
+    }
+
+    auditNcLoaded = true;
+  } catch (err) {
+    console.error("Erro ao carregar não conformidades da auditoria.", err);
+    auditNcLoadError = `Não foi possível carregar os dados da auditoria: "${err?.message || err}". Provavelmente as regras de segurança do Firestore não liberam a coleção "nao_conformidades" — verifique no Console do Firebase (Firestore Database > Regras).`;
+    auditNcData = [];
+  }
+}
+
+async function seedAuditNc() {
+  // O Firestore permite no máximo 500 operações por lote; 851 registros exigem 2 lotes.
+  const chunkSize = 450;
+  for (let i = 0; i < AUDIT_NC_SEED.length; i += chunkSize) {
+    const chunk = AUDIT_NC_SEED.slice(i, i + chunkSize);
+    const batch = writeBatch(db);
+    chunk.forEach((record) => {
+      const { id, ...fields } = record;
+      const ref = doc(collection(db, "nao_conformidades"));
+      batch.set(ref, fields);
+    });
+    await batch.commit();
+  }
+}
+
+async function addAuditNc(fields) {
+  const ref = await addDoc(collection(db, "nao_conformidades"), fields);
+  auditNcData.push({ id: ref.id, ...fields });
+  return ref.id;
+}
+
+async function updateAuditNcRecord(id, fields) {
+  await updateDoc(doc(db, "nao_conformidades", id), fields);
+  const idx = auditNcData.findIndex((item) => item.id === id);
+  if (idx !== -1) auditNcData[idx] = { ...auditNcData[idx], ...fields };
+}
+
+async function deleteAuditNcRecord(id) {
+  await deleteDoc(doc(db, "nao_conformidades", id));
+  auditNcData = auditNcData.filter((item) => item.id !== id);
+}
+
+function populateAuditSelect(selectEl, options, { allowEmpty = true } = {}) {
+  if (!selectEl) return;
+  const current = selectEl.value;
+  selectEl.innerHTML =
+    (allowEmpty ? `<option value="">Selecione...</option>` : "") +
+    options.map((opt) => `<option value="${escapeHtml(opt)}">${escapeHtml(opt)}</option>`).join("");
+  if (current) selectEl.value = current;
+}
+
+function populateAuditFormOptions() {
+  populateAuditSelect(el.auditNcAuditType, AUDIT_NC_OPTIONS.auditType);
+  populateAuditSelect(el.auditNcClient, AUDIT_NC_OPTIONS.clients);
+  populateAuditSelect(el.auditNcType, AUDIT_NC_OPTIONS.type);
+  populateAuditSelect(el.auditNcBase, AUDIT_NC_OPTIONS.bases);
+  populateAuditSelect(el.auditNcStatus, AUDIT_NC_OPTIONS.status);
+  populateAuditSelect(el.auditNcStep, AUDIT_NC_OPTIONS.step);
+  populateAuditSelect(el.auditNcRisk, AUDIT_NC_OPTIONS.riskAnalysis);
+  populateAuditSelect(el.auditNcRecurrent, AUDIT_NC_OPTIONS.recurrentInvestment);
+  populateAuditSelect(el.auditNcInvestment, AUDIT_NC_OPTIONS.recurrentInvestment);
+  populateAuditSelect(el.auditNcDept, AUDIT_NC_OPTIONS.ncDept);
+  populateAuditSelect(el.auditNcSector, AUDIT_NC_OPTIONS.ncSector);
+  populateAuditSelect(el.auditNcResponsableSector, AUDIT_NC_OPTIONS.responsableSector);
+  populateAuditSelect(el.auditNcRootCauseCode, AUDIT_NC_OPTIONS.rootCauseCode);
+  populateAuditSelect(el.auditNcResponsibleName, AUDIT_NC_OPTIONS.pacResponsibleName);
+}
+
+function truncateText(value, max) {
+  const text = String(value || "");
+  return text.length > max ? `${text.slice(0, max - 1)}…` : text;
+}
+
+function formatAuditDate(value) {
+  if (!value) return "-";
+  const parts = String(value).split("-");
+  if (parts.length !== 3) return escapeHtml(value);
+  const [y, m, d] = parts;
+  return `${d}/${m}/${y}`;
+}
+
+function auditStatusToneClass(status) {
+  if (status === "Done") return "ok";
+  if (status === "Late") return "critical";
+  if (status === "Open") return "warning";
+  return "empty";
+}
+
+function auditRiskToneClass(risk) {
+  if (risk === "Low") return "ok";
+  if (risk === "Medium") return "warning";
+  if (risk === "High" || risk === "Extreme") return "critical";
+  return "empty";
+}
+
+function filterAuditItems() {
+  const term = normalizeText(auditNcSearchTerm);
+  return auditNcData
+    .filter((item) => {
+      if (auditNcFilter !== "all" && item.status !== auditNcFilter) return false;
+      if (!term) return true;
+      const haystack = normalizeText(
+        `${item.ncNumber || ""} ${item.description || ""} ${item.base || ""} ${item.ncDept || ""} ${item.ncSector || ""} ${item.pacResponsibleName || ""}`
+      );
+      return haystack.includes(term);
+    })
+    .sort((a, b) => String(b.ncDate || "").localeCompare(String(a.ncDate || "")));
+}
+
+function renderAuditOperacao() {
+  if (el.auditOpError) {
+    if (auditNcLoadError) {
+      el.auditOpError.textContent = auditNcLoadError;
+      el.auditOpError.hidden = false;
+    } else {
+      el.auditOpError.hidden = true;
+      el.auditOpError.textContent = "";
+    }
+  }
+
+  if (el.auditOpCount) el.auditOpCount.textContent = auditNcData.length;
+  if (!el.auditTableBody) return;
+
+  const items = filterAuditItems();
+
+  if (!items.length) {
+    el.auditTableBody.innerHTML = "";
+    if (el.auditEmptyState) el.auditEmptyState.hidden = false;
+    return;
+  }
+  if (el.auditEmptyState) el.auditEmptyState.hidden = true;
+
+  el.auditTableBody.innerHTML = items
+    .map(
+      (item) => `
+    <tr data-audit-id="${escapeHtml(item.id)}" class="audit-row">
+      <td>${escapeHtml(item.ncNumber || "-")}</td>
+      <td class="audit-td-desc">${escapeHtml(truncateText(item.description, 70))}</td>
+      <td>${escapeHtml(item.base || "-")}</td>
+      <td>${escapeHtml(item.ncDept || "-")}</td>
+      <td><span class="audit-status-pill ${auditStatusToneClass(item.status)}">${escapeHtml(item.status || "-")}</span></td>
+      <td><span class="audit-status-pill ${auditRiskToneClass(item.riskAnalysis)}">${escapeHtml(item.riskAnalysis || "-")}</span></td>
+      <td>${formatAuditDate(item.deadline)}</td>
+      <td>${escapeHtml(item.pacResponsibleName || "-")}</td>
+    </tr>
+  `
+    )
+    .join("");
+
+  el.auditTableBody.querySelectorAll("[data-audit-id]").forEach((row) => {
+    row.addEventListener("click", () => openAuditNcModal(row.dataset.auditId));
+  });
+}
+
+function auditFormFieldMap() {
+  return {
+    description: el.auditNcDescription,
+    auditType: el.auditNcAuditType,
+    client: el.auditNcClient,
+    auditNumber: el.auditNcAuditNumber,
+    type: el.auditNcType,
+    ncNumber: el.auditNcNumber,
+    base: el.auditNcBase,
+    status: el.auditNcStatus,
+    step: el.auditNcStep,
+    riskAnalysis: el.auditNcRisk,
+    recurrentNc: el.auditNcRecurrent,
+    needsInvestment: el.auditNcInvestment,
+    ncDate: el.auditNcDate,
+    ncDept: el.auditNcDept,
+    ncSector: el.auditNcSector,
+    responsableSector: el.auditNcResponsableSector,
+    rootCauseDescription: el.auditNcRootCauseDescription,
+    rootCauseCode: el.auditNcRootCauseCode,
+    pacResponsibleName: el.auditNcResponsibleName,
+    deadline: el.auditNcDeadline,
+    extension1: el.auditNcExtension1,
+    extension2: el.auditNcExtension2,
+    ncClosureDate: el.auditNcClosureDate,
+    highlight: el.auditNcHighlight
+  };
+}
+
+function openAuditNcModal(id) {
+  if (!el.auditNcModal) return;
+  populateAuditFormOptions();
+  auditNcEditingId = id || null;
+  const record = id ? auditNcData.find((item) => item.id === id) : null;
+  const fields = auditFormFieldMap();
+
+  Object.entries(fields).forEach(([key, input]) => {
+    if (!input) return;
+    input.value = record ? record[key] || "" : "";
+  });
+
+  if (el.auditNcModalTitle) {
+    el.auditNcModalTitle.textContent = record ? `Editar ${record.ncNumber || "não conformidade"}` : "Nova não conformidade";
+  }
+  if (el.auditNcDeleteBtn) el.auditNcDeleteBtn.hidden = !record;
+  if (el.auditNcMessage) el.auditNcMessage.textContent = "";
+  el.auditNcModal.hidden = false;
+}
+
+function closeAuditNcModal() {
+  if (el.auditNcModal) el.auditNcModal.hidden = true;
+  auditNcEditingId = null;
+}
+
+el.auditNewBtn?.addEventListener("click", () => openAuditNcModal(null));
+el.auditNcCloseBtn?.addEventListener("click", closeAuditNcModal);
+el.auditNcCancelBtn?.addEventListener("click", closeAuditNcModal);
+
+el.auditNcForm?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const fields = auditFormFieldMap();
+  const payload = {};
+  Object.entries(fields).forEach(([key, input]) => {
+    if (input) payload[key] = input.value.trim();
+  });
+  payload.year = payload.ncDate ? payload.ncDate.slice(0, 4) : "";
+
+  if (!payload.description || !payload.ncNumber) {
+    if (el.auditNcMessage) el.auditNcMessage.textContent = "Preencha ao menos a descrição e o número da NC.";
+    return;
+  }
+
+  if (el.auditNcSaveBtn) el.auditNcSaveBtn.disabled = true;
+  try {
+    if (auditNcEditingId) {
+      await updateAuditNcRecord(auditNcEditingId, payload);
+    } else {
+      await addAuditNc(payload);
+    }
+    closeAuditNcModal();
+    renderAuditOperacao();
+    renderAuditoriaDashboard();
+  } catch (err) {
+    if (el.auditNcMessage) el.auditNcMessage.textContent = "Não foi possível salvar. Tente novamente.";
+    console.error(err);
+  } finally {
+    if (el.auditNcSaveBtn) el.auditNcSaveBtn.disabled = false;
+  }
+});
+
+el.auditNcDeleteBtn?.addEventListener("click", async () => {
+  if (!auditNcEditingId) return;
+  if (!confirm("Excluir esta não conformidade?")) return;
+  try {
+    await deleteAuditNcRecord(auditNcEditingId);
+    closeAuditNcModal();
+    renderAuditOperacao();
+    renderAuditoriaDashboard();
+  } catch (err) {
+    console.error(err);
+  }
+});
+
+el.auditSearch?.addEventListener("input", () => {
+  auditNcSearchTerm = el.auditSearch.value || "";
+  renderAuditOperacao();
+});
+
+el.auditFilterChips?.forEach((chip) => {
+  chip.addEventListener("click", () => {
+    el.auditFilterChips.forEach((c) => c.classList.remove("active"));
+    chip.classList.add("active");
+    auditNcFilter = chip.dataset.auditFilter;
+    renderAuditOperacao();
+  });
+});
+
+function auditGroupCount(items, field, { excludeNA = true } = {}) {
+  const map = new Map();
+  items.forEach((item) => {
+    const key = String(item[field] || "").trim();
+    if (!key || (excludeNA && key === "N/A")) return;
+    map.set(key, (map.get(key) || 0) + 1);
+  });
+  return [...map.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8);
+}
+
+function renderAuditRankingPanel(container, ranked, unitLabel) {
+  if (!container) return;
+  if (!ranked.length) {
+    container.innerHTML = `<p class="ranking-empty">Sem dados suficientes ainda.</p>`;
+    return;
+  }
+  container.innerHTML = ranked
+    .map(
+      ([label, count], index) => `
+    <div class="ranking-row">
+      <strong>${index + 1}. ${escapeHtml(label)}</strong>
+      <span>${count} ${unitLabel}</span>
+    </div>
+  `
+    )
+    .join("");
+}
+
+function auditRiskColor(level) {
+  return { Low: "#3fb950", Medium: "#d29922", High: "#f85149", Extreme: "#f85149", OM: "#8b949e" }[level] || "#58a6ff";
+}
+
+function renderAuditYearChart(items) {
+  const canvas = document.getElementById("auditYearChart");
+  if (!canvas || typeof Chart === "undefined") return;
+
+  const counts = {};
+  items.forEach((item) => {
+    if (item.year) counts[item.year] = (counts[item.year] || 0) + 1;
+  });
+  const years = Object.keys(counts).sort();
+
+  if (auditChart) auditChart.destroy();
+  auditChart = new Chart(canvas, {
+    type: "bar",
+    data: {
+      labels: years,
+      datasets: [{ label: "Não conformidades", data: years.map((y) => counts[y]), backgroundColor: "#58a6ff", borderRadius: 4 }]
+    },
+    options: {
+      maintainAspectRatio: false,
+      resizeDelay: 120,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { color: "#a1a1aa" }, grid: { color: "rgba(255, 255, 255, 0.06)" } },
+        y: { beginAtZero: true, ticks: { color: "#a1a1aa" }, grid: { color: "rgba(255, 255, 255, 0.06)" } }
+      }
+    }
+  });
+
+  if (el.auditYearRange && years.length) {
+    el.auditYearRange.textContent = years.length > 1 ? `${years[0]} - ${years[years.length - 1]}` : years[0];
+  }
+}
+
+function renderAuditStatusChart(counts) {
+  const canvas = document.getElementById("auditStatusChart");
+  if (!canvas || typeof Chart === "undefined") return;
+
+  if (auditStatusChart) auditStatusChart.destroy();
+  auditStatusChart = new Chart(canvas, {
+    type: "doughnut",
+    data: {
+      labels: ["Abertas", "Atrasadas", "Concluídas"],
+      datasets: [{ data: [counts.abertas, counts.atrasadas, counts.concluidas], backgroundColor: ["#d29922", "#f85149", "#3fb950"], borderWidth: 0 }]
+    },
+    options: {
+      cutout: "68%",
+      maintainAspectRatio: false,
+      resizeDelay: 120,
+      plugins: { legend: { position: "bottom", labels: { color: "#e5e7eb" } } }
+    }
+  });
+}
+
+function renderAuditRiskChart(items) {
+  const canvas = document.getElementById("auditRiskChart");
+  if (!canvas || typeof Chart === "undefined") return;
+
+  const order = ["Low", "Medium", "High", "Extreme", "OM"];
+  const counts = {};
+  items.forEach((item) => {
+    if (item.riskAnalysis) counts[item.riskAnalysis] = (counts[item.riskAnalysis] || 0) + 1;
+  });
+  const labels = order.filter((level) => counts[level]);
+
+  if (auditRiskChart) auditRiskChart.destroy();
+  auditRiskChart = new Chart(canvas, {
+    type: "bar",
+    data: {
+      labels,
+      datasets: [{ data: labels.map((level) => counts[level]), backgroundColor: labels.map(auditRiskColor), borderRadius: 4 }]
+    },
+    options: {
+      indexAxis: "y",
+      maintainAspectRatio: false,
+      resizeDelay: 120,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { beginAtZero: true, ticks: { color: "#a1a1aa" }, grid: { color: "rgba(255, 255, 255, 0.06)" } },
+        y: { ticks: { color: "#a1a1aa" }, grid: { display: false } }
+      }
+    }
+  });
+}
+
+function renderAuditoriaDashboard() {
+  if (el.auditDashboardError) {
+    if (auditNcLoadError) {
+      el.auditDashboardError.textContent = auditNcLoadError;
+      el.auditDashboardError.hidden = false;
+    } else {
+      el.auditDashboardError.hidden = true;
+      el.auditDashboardError.textContent = "";
+    }
+  }
+
+  const items = auditNcData;
+  const total = items.length;
+  const atrasadas = items.filter((item) => item.status === "Late").length;
+  const abertas = items.filter((item) => item.status === "Open").length;
+  const concluidas = items.filter((item) => item.status === "Done").length;
+  const reincidentes = items.filter((item) => item.recurrentNc === "Yes").length;
+  const investimento = items.filter((item) => item.needsInvestment === "Yes").length;
+
+  if (el.auditMetricTotal) el.auditMetricTotal.textContent = total;
+  if (el.auditMetricTotalCard) el.auditMetricTotalCard.textContent = total;
+  if (el.auditMetricAbertas) el.auditMetricAbertas.textContent = abertas + atrasadas;
+  if (el.auditMetricAtrasadas) el.auditMetricAtrasadas.textContent = atrasadas;
+  if (el.auditMetricConcluidas) el.auditMetricConcluidas.textContent = concluidas;
+  if (el.auditMetricReincidentes) el.auditMetricReincidentes.textContent = reincidentes;
+  if (el.auditMetricInvestimento) el.auditMetricInvestimento.textContent = investimento;
+
+  renderAuditRankingPanel(el.auditRankingSetor, auditGroupCount(items, "ncDept"), "não conformidades");
+  renderAuditRankingPanel(el.auditRankingBase, auditGroupCount(items, "base", { excludeNA: false }), "não conformidades");
+  renderAuditRankingPanel(el.auditRankingCausa, auditGroupCount(items, "rootCauseCode"), "ocorrências");
+
+  renderAuditYearChart(items);
+  renderAuditStatusChart({ abertas, atrasadas, concluidas });
+  renderAuditRiskChart(items);
+}
+
+async function openAuditoriaDashboardTab() {
+  await carregarAuditoriaNc();
+  renderAuditoriaDashboard();
+}
+
+async function openAuditoriaOperacaoTab() {
+  await carregarAuditoriaNc();
+  renderAuditOperacao();
 }
 
 function renderHistorico() {
@@ -5945,6 +6480,8 @@ window.showTab = function (tab) {
   if (tab === "tabela") renderTable();
   if (tab === "adPesquisa") renderAdMonitor();
   if (tab === "adNotificacoes") renderAdNotifications();
+  if (tab === "auditoriaDashboard") openAuditoriaDashboardTab();
+  if (tab === "auditoriaOperacao") openAuditoriaOperacaoTab();
   if (tab === "publicacoes") {
     renderPublicationNetwork();
     startPublicationFloat();
