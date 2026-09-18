@@ -928,7 +928,6 @@ const el = {
   auditCriarOverviewSummary: document.getElementById("auditCriarOverviewSummary"),
   auditCriarOverviewChart: document.getElementById("auditCriarOverviewChart"),
   auditCriarOverviewChartEmpty: document.getElementById("auditCriarOverviewChartEmpty"),
-  auditCriarOverviewEmpty: document.getElementById("auditCriarOverviewEmpty"),
   auditCriarFormBackBtn: document.getElementById("auditCriarFormBackBtn"),
   auditCriarForm: document.getElementById("auditCriarForm"),
   auditCriarNumero: document.getElementById("auditCriarNumero"),
@@ -2317,14 +2316,9 @@ function renderAuditCriarOverview() {
 
   if (!allList.length) {
     if (el.auditCriarOverview) el.auditCriarOverview.hidden = true;
-    if (el.auditCriarOverviewEmpty) {
-      el.auditCriarOverviewEmpty.hidden = false;
-      el.auditCriarOverviewEmpty.textContent = "Crie sua primeira auditoria para ver o resumo aqui.";
-    }
     return;
   }
   if (el.auditCriarOverview) el.auditCriarOverview.hidden = false;
-  if (el.auditCriarOverviewEmpty) el.auditCriarOverviewEmpty.hidden = true;
 
   const term = normalizeText(auditCriarSearchTerm);
   const list = allList.filter((a) => {
