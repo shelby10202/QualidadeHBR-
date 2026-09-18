@@ -1,5 +1,5 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import { getFirestore, collection, addDoc, getDocs, deleteDoc, doc, updateDoc, setDoc, writeBatch } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { getFirestore, collection, addDoc, getDocs, getDoc, deleteDoc, doc, updateDoc, setDoc, writeBatch } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
 const firebaseConfig = {
@@ -74,6 +74,233 @@ const AUDIT_NC_OPTIONS = window.AUDIT_NC_OPTIONS || {
   recurrentInvestment: [], ncDept: [], ncSector: [], responsableSector: [],
   rootCauseCode: [], pacResponsibleName: [], auditType: []
 };
+
+// Modelos dos checklists de auditoria (CHKMNT-001, CHKMNT-003, CHKPNT-001, CHKFMA-001, CHKGRC-001).
+// "spot": checklist de vistoria de setor (4 status: OK / NC / OM / N/A, com Linha/Slot e assinaturas).
+// "grc": checklist de conformidade de registro por aeronave (3 status: OK / NOK / N/A).
+const AUDIT_CHECKLIST_TEMPLATES = [
+  {
+    code: "CHKMNT-001",
+    name: "Hangar de Manutenção",
+    rev: "Rev.04",
+    kind: "spot",
+    ncDept: "Hangar de Manutenção",
+    categories: [
+      { name: "Segurança e Saúde", items: [
+        { n: 1, text: "Colaboradores estão utilizando EPI adequados e sabem localizá-los?" },
+        { n: 2, text: "Colaboradores sabem manusear e localizar todos os recipientes lava-olhos no hangar?" },
+        { n: 3, text: "Os recipientes lava-olhos estão válidos conforme a etiqueta de inspeção e controle?" }
+      ]},
+      { name: "Infraestrutura, Organização e Limpeza", items: [
+        { n: 4, text: "As instalações apresentam boas condições de organização, disposição, limpeza e conservação?" },
+        { n: 5, text: "O layout do hangar está adequado, com distâncias mínimas entre aeronaves x equipamentos seguros?" },
+        { n: 6, text: "O Hangar possui balizamento de segurança adequado?" },
+        { n: 7, text: "A Iluminação do Hangar está adequada?" }
+      ]},
+      { name: "Identificação", items: [
+        { n: 8, text: "Todos os artigos aeronáuticos presentes na oficina estão identificados com etiqueta conforme seu status de condição?" },
+        { n: 9, text: "As etiquetas de identificação dos artigos aeronáuticos estão corretamente preenchidas?" },
+        { n: 10, text: "Os químicos/inflamáveis estão corretamente identificados com a etiqueta do estoque?" },
+        { n: 11, text: "Todas as caixas de armazenamento de materiais / peças estão identificadas corretamente?" }
+      ]},
+      { name: "Materiais / Artigos Aeronáuticos", items: [
+        { n: 12, text: "Todos os materiais sujeitos a vida limite estão válidos e controlados?" },
+        { n: 13, text: "As prateleiras/armários dedicados a aeronave em manutenção estão organizadas e corretamente identificadas, com segregação adequada dos materiais?" },
+        { n: 14, text: "Os materiais dedicados a uma aeronave específica estão alocados na prateleira/armário correta desta aeronave?" },
+        { n: 15, text: "Todos os materiais de aplicação presentes nas prateleiras/armários no slot da aeronave estão identificados e livres de objetos estranhos (F.O.D)?" },
+        { n: 16, text: "Todos os componentes e peças removidos da aeronave para inspeção, estão armazenados e protegidos adequadamente na oficina?" },
+        { n: 17, text: "Os artigos aeronáuticos condenados estão identificados com etiqueta vermelha, com formulário FQ-108 preenchido, e segregados na Quarentena (conforme aplicável)?" },
+        { n: 18, text: "Todas as peças/químicos sobressalentes das aeronaves já entregues foram devolvidos ao Estoque?" }
+      ]},
+      { name: "Ferramentas", items: [
+        { n: 19, text: "Os carrinhos de ferramentas estão organizados e limpos, com ferramentas posicionadas nos slots e sem objetos pessoais/suprimentos no carrinho?" },
+        { n: 20, text: "Todas as ferramentas calibráveis estão válidas e com etiqueta de calibração legível e anexada a ferramenta?" }
+      ]},
+      { name: "Registros de Manutenção", items: [
+        { n: 21, text: "Toda documentação da O.S está preenchida, assinada e carimbada corretamente?" }
+      ]},
+      { name: "Sistema Tendência", items: [
+        { n: 22, text: "Inspetores, Mecânicos e Auxiliares estão apontados na aeronave e na tarefa em execução correta?" },
+        { n: 23, text: "Todos os colaboradores estão com acesso ao Sistema Tendência e possuem cadastro?" },
+        { n: 24, text: "Está sendo observado o registro da passagem de serviço na O.S?" }
+      ]}
+    ]
+  },
+  {
+    code: "CHKMNT-003",
+    name: "Oficinas de Componentes",
+    rev: "Rev.01",
+    kind: "spot",
+    ncDept: "Oficinas de Componentes",
+    categories: [
+      { name: "Segurança e Saúde", items: [
+        { n: 1, text: "Colaboradores estão utilizando EPI adequados e sabem localizá-los?" },
+        { n: 2, text: "Colaboradores sabem manusear e localizar os recipientes lava-olhos na Oficina?" },
+        { n: 3, text: "Os recipientes lava-olhos estão válidos conforme a etiqueta de inspeção e controle?" }
+      ]},
+      { name: "Infraestrutura, Organização e Limpeza", items: [
+        { n: 4, text: "As instalações apresentam boas condições de organização, disposição, limpeza e conservação?" },
+        { n: 5, text: "O layout da Oficina está adequado, com distâncias mínimas entre bancadas, máquinas e equipamentos segura?" },
+        { n: 6, text: "A Oficina possui balizamento de segurança adequado?" },
+        { n: 7, text: "A Iluminação da Oficina está adequada?" },
+        { n: 8, text: "O controle de temperatura, umidade e pressão (FQ-042) está preenchido corretamente?" }
+      ]},
+      { name: "Identificação", items: [
+        { n: 9, text: "Todos os artigos aeronáuticos presentes na oficina estão identificados com etiqueta conforme seu status de condição?" },
+        { n: 10, text: "As etiquetas de identificação dos artigos aeronáuticos estão corretamente preenchidas?" },
+        { n: 11, text: "Os químicos/inflamáveis estão corretamente identificados com a etiqueta do estoque?" }
+      ]},
+      { name: "Materiais / Artigos Aeronáuticos", items: [
+        { n: 12, text: "Todos os materiais sujeitos a vida limite dentro da Oficina estão válidos e controlados?" },
+        { n: 13, text: "Os artigos aeronáuticos estão segregados conforme seu status de condição? Artigos reparáveis (etiqueta amarela), artigos reparados (etiqueta verde) e artigos condenados (etiqueta vermelha)?" }
+      ]},
+      { name: "Ferramentas", items: [
+        { n: 14, text: "Os formulários de Listagem de Ferramentas Calibráveis (FQ-076), Ferramentas Especiais (FQ-077) e Ferramentas Comuns (FQ-079) estão corretamente preenchidos e disponíveis?" },
+        { n: 15, text: "O painel de ferramentas da Oficina, possui formulário de Layout e Inventário (FQ-003) preenchido corretamente e disponível?" },
+        { n: 16, text: "O controle de entrada e saída de ferramentas da Oficina (FQ-040) está sendo efetuado corretamente?" },
+        { n: 17, text: "Todas as ferramentas da Oficina estão identificadas, íntegras, organizadas e disponíveis?" },
+        { n: 18, text: "Todas as ferramentas calibráveis estão válidas e com etiqueta de calibração legível e anexada a ferramenta?" }
+      ]},
+      { name: "Plano de Manutenção de Bancadas", items: [
+        { n: 19, text: "Todos os Planos de Manutenção das Bancadas (FE-005) estão disponíveis e preenchidos corretamente?" }
+      ]},
+      { name: "Registros de Manutenção", items: [
+        { n: 20, text: "O formulário de O.S (FQ-035) e todos os documentos da O.S estão corretamente preenchidos e disponíveis?" }
+      ]},
+      { name: "Sistema Tendência", items: [
+        { n: 21, text: "Todos os colaboradores estão com acesso ao Sistema Tendência e possuem cadastro?" }
+      ]}
+    ]
+  },
+  {
+    code: "CHKPNT-001",
+    name: "Cabines de Pintura",
+    rev: "Rev.02",
+    kind: "spot",
+    ncDept: "Cabines de Pintura",
+    categories: [
+      { name: "Identificação", items: [
+        { n: 1, text: "Todos os componentes presentes na oficina estão identificados com etiqueta amarela (item reparável) e corretamente preenchidos?" },
+        { n: 2, text: "As etiquetas de identificação dos artigos aeronáuticos estão corretamente preenchidas?" },
+        { n: 3, text: "Todos os químicos e tintas presentes na oficina estão corretamente identificados com a etiqueta padrão do estoque HBR?" },
+        { n: 4, text: "As bancadas de trabalho e as bandejas estão identificadas com o prefixo da aeronave em questão, evitando a destinação ou uso indevido dos itens (conforme aplicável)?" }
+      ]},
+      { name: "Materiais", items: [
+        { n: 5, text: "Todos os químicos e tintas estão válidos e controlados?" }
+      ]},
+      { name: "Infraestrutura, Organização e Limpeza", items: [
+        { n: 6, text: "As instalações apresentam boas condições de organização, disposição, limpeza e conservação?" },
+        { n: 7, text: "A Iluminação da Oficina está adequada?" },
+        { n: 8, text: "O controle de temperatura, umidade e pressão (FQ-042) está preenchido corretamente?" }
+      ]},
+      { name: "Segurança e Saúde", items: [
+        { n: 9, text: "Colaboradores estão utilizando EPI adequados e sabem localizá-los?" },
+        { n: 10, text: "Colaboradores sabem utilizar e localizar a estação de lava-olhos próximo a Oficina em caso de emergência?" }
+      ]},
+      { name: "Manutenção", items: [
+        { n: 11, text: "A manutenção dos filtros de cada cabine de pintura está sendo realizada a cada 2 meses ou conforme necessário?" }
+      ]},
+      { name: "Sistema Tendência", items: [
+        { n: 12, text: "Os colaboradores estão apontados corretamente na aeronave/componente em serviço e na tarefa específica em execução?" }
+      ]}
+    ]
+  },
+  {
+    code: "CHKFMA-001",
+    name: "F.M.A.",
+    rev: "Rev.02",
+    kind: "spot",
+    ncDept: "F.M.A.",
+    categories: [
+      { name: "Segurança e Saúde", items: [
+        { n: 1, text: "Colaboradores estão utilizando EPI adequados e sabem localizá-los?" },
+        { n: 2, text: "Colaboradores sabem manusear e localizar os recipientes lava-olhos na Oficina?" },
+        { n: 3, text: "Os recipientes lava-olhos estão válidos conforme a etiqueta de inspeção e controle?" },
+        { n: 4, text: "A caixa de EPI disponível na área está em conformidade?" }
+      ]},
+      { name: "Infraestrutura, Organização e Limpeza", items: [
+        { n: 5, text: "As instalações apresentam boas condições de organização, disposição, limpeza e conservação?" },
+        { n: 6, text: "O layout da Oficina está adequado?" },
+        { n: 7, text: "A Iluminação da Oficina está adequada?" }
+      ]},
+      { name: "Identificação", items: [
+        { n: 8, text: "Todos os artigos aeronáuticos presentes na oficina estão identificados com etiqueta conforme seu status de condição (conforme aplicável)?" },
+        { n: 9, text: "As etiquetas de identificação dos artigos aeronáuticos estão corretamente preenchidas?" },
+        { n: 10, text: "Os químicos/inflamáveis estão corretamente identificados com a etiqueta do estoque?" }
+      ]},
+      { name: "Materiais / Artigos Aeronáuticos", items: [
+        { n: 11, text: "Todos os materiais sujeitos a vida limite dentro da Oficina estão válidos e controlados?" },
+        { n: 12, text: "Os artigos aeronáuticos estão segregados conforme seu status de condição? Artigos reparáveis (etiqueta amarela), artigos reparados (etiqueta verde) e artigos condenados (etiqueta vermelha)?" }
+      ]},
+      { name: "Ferramentas", items: [
+        { n: 13, text: "Todas as ferramentas da Oficina estão identificadas, íntegras, organizadas e disponíveis?" },
+        { n: 14, text: "Todas as ferramentas calibráveis estão válidas e com etiqueta de calibração legível e anexada a ferramenta?" }
+      ]},
+      { name: "Procedimentos Específicos", items: [
+        { n: 15, text: "O procedimento \"POP FMA\", em sua última revisão, está sendo seguido pelos colaboradores? O procedimento em execução reflete o que está documentado?" },
+        { n: 16, text: "O procedimento \"POP FMA – DEPARTAMENTO COMPOSTOS\", em sua última revisão, está sendo seguido pelos colaboradores? O procedimento em execução reflete o que está documentado?" }
+      ]},
+      { name: "Registros de Manutenção", items: [
+        { n: 17, text: "O formulário de O.S (FP-050) e todos documentos da O.S estão corretamente preenchidos e disponíveis?" },
+        { n: 18, text: "O formulário de O.S (FFMA-002 - COMPOSTOS) e todos documentos da O.S estão corretamente preenchidos e disponíveis?" }
+      ]},
+      { name: "Sistema Tendência", items: [
+        { n: 19, text: "Todos os colaboradores estão com acesso ao Sistema Tendência e possuem cadastro?" }
+      ]}
+    ]
+  },
+  {
+    code: "CHKGRC-001",
+    name: "Gestão de Registro e Conformidade (GRC)",
+    rev: "Rev.02",
+    kind: "grc",
+    ncDept: "Gestão de Registro e Conformidade",
+    grcFields: [
+      { key: "matricula", label: "Matrícula" },
+      { key: "ordemServico", label: "Ordem de Serviço" },
+      { key: "servico", label: "Serviço" },
+      { key: "fabricante", label: "Fabricante" },
+      { key: "modelo", label: "Modelo" },
+      { key: "sn", label: "S/N" },
+      { key: "motor", label: "Motor" },
+      { key: "motorModelo", label: "Modelo do Motor" },
+      { key: "motorSn", label: "S/N do Motor" },
+      { key: "mecanico", label: "Mecânico" },
+      { key: "inspetor", label: "Inspetor" },
+      { key: "ctm", label: "CTM" }
+    ],
+    categories: [
+      { name: "Verificação de Conformidade", items: [
+        { n: 1, text: "Capa e Folha Rosto" },
+        { n: 2, text: "Formulário Ordem de Serviço (O.S.) – FMNT-003" },
+        { n: 3, text: "Lista / Ficha Discrepância" },
+        { n: 4, text: "Ficha de Recebimento e Entrega de Aeronave" },
+        { n: 5, text: "Mapa de Controle / Componentes" },
+        { n: 6, text: "Lista de Grande Modificações, Reparos e itens Opcionais instalados na ocasião" },
+        { n: 7, text: "Formulário de Certificado de Verificação de Aeronavegabilidade (CVA)" },
+        { n: 8, text: "Relatório de Preservação - Célula / Motor(es)" },
+        { n: 9, text: "Roteiro de Célula (Aeronave)" },
+        { n: 10, text: "Roteiro de Motor(es)" },
+        { n: 11, text: "Roteiro Componentes Instalados / Instruções Aeronavegabilidade Continua (ICA)" },
+        { n: 12, text: "Diretrizes de Aeronavegabilidades (AD) / Boletins de Serviços (SB) / Fichas de Cumprimentos de DA (FCDA)" },
+        { n: 13, text: "Log Card – Cópias / Removidos / Instalados / Atualizados" },
+        { n: 14, text: "EASA Form1 / SegVoo 001 / SegVoo 003 / Certificados de Conformidade (CoC)" },
+        { n: 15, text: "Ordem de Serviço (Relatório Tendência)" },
+        { n: 16, text: "Ordem de Serviço (Relatório Cliente)" },
+        { n: 17, text: "Etiquetas" }
+      ]}
+    ]
+  }
+];
+
+function auditChecklistStatusOptions(kind) {
+  return kind === "grc" ? ["OK", "NOK", "N/A"] : ["OK", "NC", "OM", "N/A"];
+}
+
+function auditChecklistFindingStatuses(kind) {
+  // Quais status desse tipo de checklist geram um lançamento na área de Não Conformidades.
+  return kind === "grc" ? ["NOK"] : ["NC", "OM"];
+}
 
 // Cada linha da planilha aponta para a imagem solicitada para o dashboard e cards.
 const DASHBOARD_LINE_CONFIG = {
@@ -604,6 +831,8 @@ const el = {
   areaPreviewCharts: document.getElementById("areaPreviewCharts"),
   areaPreviewDataSource: document.getElementById("areaPreviewDataSource"),
   adminUsersList: document.getElementById("adminUsersList"),
+  adminApprovalsList: document.getElementById("adminApprovalsList"),
+  adminApprovalsCount: document.getElementById("adminApprovalsCount"),
   adminAreasList: document.getElementById("adminAreasList"),
   adminReminderForm: document.getElementById("adminReminderForm"),
   adminReminderText: document.getElementById("adminReminderText"),
@@ -682,6 +911,35 @@ const el = {
 
   auditDashboardError: document.getElementById("audit_dashboard_error"),
   auditOpError: document.getElementById("audit_op_error"),
+
+  auditCriarError: document.getElementById("audit_criar_error"),
+  auditCriarStepLista: document.getElementById("auditCriarStepLista"),
+  auditCriarStepForm: document.getElementById("auditCriarStepForm"),
+  auditCriarStepPicker: document.getElementById("auditCriarStepPicker"),
+  auditCriarStepFill: document.getElementById("auditCriarStepFill"),
+  auditCriarSearch: document.getElementById("auditCriarSearch"),
+  auditCriarNewBtn: document.getElementById("auditCriarNewBtn"),
+  auditCriarList: document.getElementById("auditCriarList"),
+  auditCriarEmptyState: document.getElementById("auditCriarEmptyState"),
+  auditCriarFormBackBtn: document.getElementById("auditCriarFormBackBtn"),
+  auditCriarForm: document.getElementById("auditCriarForm"),
+  auditCriarNumero: document.getElementById("auditCriarNumero"),
+  auditCriarBase: document.getElementById("auditCriarBase"),
+  auditCriarData: document.getElementById("auditCriarData"),
+  auditCriarTipo: document.getElementById("auditCriarTipo"),
+  auditCriarCliente: document.getElementById("auditCriarCliente"),
+  auditCriarAuditor: document.getElementById("auditCriarAuditor"),
+  auditCriarAuditado: document.getElementById("auditCriarAuditado"),
+  auditCriarObs1: document.getElementById("auditCriarObs1"),
+  auditCriarObs2: document.getElementById("auditCriarObs2"),
+  auditCriarFormMessage: document.getElementById("auditCriarFormMessage"),
+  auditCriarCancelBtn: document.getElementById("auditCriarCancelBtn"),
+  auditCriarSaveBtn: document.getElementById("auditCriarSaveBtn"),
+  auditCriarPickerBackBtn: document.getElementById("auditCriarPickerBackBtn"),
+  auditCriarPickerNumero: document.getElementById("auditCriarPickerNumero"),
+  auditCriarPickerGrid: document.getElementById("auditCriarPickerGrid"),
+  auditCriarFillBackBtn: document.getElementById("auditCriarFillBackBtn"),
+  auditCriarFillContainer: document.getElementById("auditCriarFillContainer"),
   auditMetricTotal: document.getElementById("audit_metric_total"),
   auditMetricTotalCard: document.getElementById("audit_metric_total_card"),
   auditMetricAbertas: document.getElementById("audit_metric_abertas"),
@@ -696,6 +954,7 @@ const el = {
 
   auditOpCount: document.getElementById("audit_op_count"),
   auditSearch: document.getElementById("auditSearch"),
+  auditNumberFilterSelect: document.getElementById("auditNumberFilter"),
   auditFilterChips: document.querySelectorAll("[data-audit-filter]"),
   auditNewBtn: document.getElementById("auditNewBtn"),
   auditTableBody: document.getElementById("audit_table_body"),
@@ -780,12 +1039,23 @@ let areaBuilderPendingPointer = null;
 let auditNcData = [];
 let auditNcFilter = "all";
 let auditNcSearchTerm = "";
+let auditNcAuditNumberFilter = "";
 let auditNcEditingId = null;
 let auditNcLoaded = false;
 let auditNcLoadError = "";
 let auditChart = null;
 let auditStatusChart = null;
 let auditRiskChart = null;
+
+let auditoriasData = [];
+let auditoriaChecklistsData = [];
+let auditoriasLoaded = false;
+let auditoriasLoadError = "";
+let auditCriarSearchTerm = "";
+let auditCriarCurrentAuditoria = null;
+let auditCriarCurrentChecklist = null; // template object da checklist em preenchimento
+let auditCriarCurrentValues = {}; // { itemN: { status, nota } }
+let auditCriarCurrentGrcFields = {};
 
 function prepareStaticShells() {
   // O dashboard antigo e parcialmente estatico e substituido por uma estrutura unica.
@@ -970,14 +1240,39 @@ el.signupBtn.onclick = async () => {
   setLoginMessage("Criando usuário...", "info");
 
   try {
-    await createUserWithEmailAndPassword(auth, email, senha);
-    setLoginMessage("Usuário criado. Entrando...", "success");
+    const cred = await createUserWithEmailAndPassword(auth, email, senha);
+    try {
+      await setDoc(
+        doc(db, "usuarios", cred.user.uid),
+        {
+          email: cred.user.email || email,
+          aprovado: false,
+          criadoEm: new Date().toISOString()
+        },
+        { merge: true }
+      );
+    } catch (regErr) {
+      console.error("Não foi possível registrar a solicitação de acesso.", regErr);
+    }
+    await auth.signOut();
+    setLoginMessage("Conta criada! Aguarde um administrador aprovar seu acesso antes de entrar.", "success");
   } catch (err) {
     setLoginMessage(getAuthErrorMessage(err), "error");
   } finally {
     setLoginLoading(false);
   }
 };
+
+async function checkUserApproval(user) {
+  try {
+    const snap = await getDoc(doc(db, "usuarios", user.uid));
+    if (!snap.exists()) return true; // usuário antigo, sem esse campo ainda: não bloqueia
+    return snap.data().aprovado !== false;
+  } catch (err) {
+    console.error("Não foi possível checar a aprovação do usuário; liberando acesso por precaução.", err);
+    return true;
+  }
+}
 
 onAuthStateChanged(auth, async (user) => {
   if (!user) {
@@ -988,9 +1283,19 @@ onAuthStateChanged(auth, async (user) => {
     return;
   }
 
-  setLoginMessage("", "info");
   el.loginScreen.style.display = "none";
   el.loaderScreen.style.display = "flex";
+
+  const aprovado = await checkUserApproval(user);
+  if (!aprovado) {
+    await auth.signOut();
+    el.loaderScreen.style.display = "none";
+    el.loginScreen.style.display = "flex";
+    setLoginMessage("Sua conta ainda não foi aprovada por um administrador. Aguarde a liberação do acesso.", "error");
+    return;
+  }
+
+  setLoginMessage("", "info");
   if (el.userEmail) el.userEmail.textContent = user.email;
   await saveCurrentUserPresence(user);
   await carregarDados();
@@ -1254,6 +1559,7 @@ function filterAuditItems() {
   return auditNcData
     .filter((item) => {
       if (auditNcFilter !== "all" && item.status !== auditNcFilter) return false;
+      if (auditNcAuditNumberFilter && item.auditNumber !== auditNcAuditNumberFilter) return false;
       if (!term) return true;
       const haystack = normalizeText(
         `${item.ncNumber || ""} ${item.description || ""} ${item.base || ""} ${item.ncDept || ""} ${item.ncSector || ""} ${item.pacResponsibleName || ""}`
@@ -1261,6 +1567,18 @@ function filterAuditItems() {
       return haystack.includes(term);
     })
     .sort((a, b) => String(b.ncDate || "").localeCompare(String(a.ncDate || "")));
+}
+
+function populateAuditNumberFilterOptions() {
+  if (!el.auditNumberFilterSelect) return;
+  const numbers = [...new Set(auditNcData.map((item) => item.auditNumber || "").filter(Boolean))].sort((a, b) =>
+    a.localeCompare(b, "pt-BR", { numeric: true })
+  );
+  const current = el.auditNumberFilterSelect.value;
+  el.auditNumberFilterSelect.innerHTML =
+    `<option value="">Todas as auditorias</option>` +
+    numbers.map((n) => `<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join("");
+  if (numbers.includes(current)) el.auditNumberFilterSelect.value = current;
 }
 
 function renderAuditOperacao() {
@@ -1275,6 +1593,7 @@ function renderAuditOperacao() {
   }
 
   if (el.auditOpCount) el.auditOpCount.textContent = auditNcData.length;
+  populateAuditNumberFilterOptions();
   if (!el.auditTableBody) return;
 
   const items = filterAuditItems();
@@ -1429,6 +1748,11 @@ el.auditNcEmitBtn?.addEventListener("click", () => {
 
 el.auditSearch?.addEventListener("input", () => {
   auditNcSearchTerm = el.auditSearch.value || "";
+  renderAuditOperacao();
+});
+
+el.auditNumberFilterSelect?.addEventListener("change", () => {
+  auditNcAuditNumberFilter = el.auditNumberFilterSelect.value || "";
   renderAuditOperacao();
 });
 
@@ -1602,6 +1926,472 @@ async function openAuditoriaOperacaoTab() {
   await carregarAuditoriaNc();
   renderAuditOperacao();
 }
+
+// ===================== Criar Auditoria (checklists de setor -> NCs) =====================
+
+async function carregarAuditorias() {
+  if (auditoriasLoaded) return;
+  auditoriasLoadError = "";
+  try {
+    const [auditoriasSnap, checklistsSnap] = await Promise.all([
+      getDocs(collection(db, "auditorias")),
+      getDocs(collection(db, "auditoria_checklists"))
+    ]);
+    auditoriasData = auditoriasSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    auditoriaChecklistsData = checklistsSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    auditoriasLoaded = true;
+  } catch (err) {
+    console.error("Erro ao carregar auditorias.", err);
+    auditoriasLoadError = `Não foi possível carregar as auditorias: "${err?.message || err}". Provavelmente as regras de segurança do Firestore não liberam as coleções "auditorias" e "auditoria_checklists" — verifique no Console do Firebase (Firestore Database > Regras).`;
+    auditoriasData = [];
+    auditoriaChecklistsData = [];
+  }
+}
+
+async function openAuditoriaCriarTab() {
+  await carregarAuditorias();
+  if (el.auditCriarError) {
+    if (auditoriasLoadError) {
+      el.auditCriarError.textContent = auditoriasLoadError;
+      el.auditCriarError.hidden = false;
+    } else {
+      el.auditCriarError.hidden = true;
+      el.auditCriarError.textContent = "";
+    }
+  }
+  populateAuditCriarFormOptions();
+  showAuditCriarStep("lista");
+  renderAuditCriarLista();
+}
+
+function showAuditCriarStep(step) {
+  if (el.auditCriarStepLista) el.auditCriarStepLista.hidden = step !== "lista";
+  if (el.auditCriarStepForm) el.auditCriarStepForm.hidden = step !== "form";
+  if (el.auditCriarStepPicker) el.auditCriarStepPicker.hidden = step !== "picker";
+  if (el.auditCriarStepFill) el.auditCriarStepFill.hidden = step !== "fill";
+}
+
+function populateAuditCriarFormOptions() {
+  const fill = (select, options) => {
+    if (!select) return;
+    const current = select.value;
+    select.innerHTML =
+      `<option value="">Selecione...</option>` + options.map((o) => `<option value="${escapeHtml(o)}">${escapeHtml(o)}</option>`).join("");
+    if (options.includes(current)) select.value = current;
+  };
+  fill(el.auditCriarBase, AUDIT_NC_OPTIONS.bases || []);
+  fill(el.auditCriarTipo, AUDIT_NC_OPTIONS.auditType || []);
+  fill(el.auditCriarCliente, AUDIT_NC_OPTIONS.clients || []);
+}
+
+function auditoriaChecklistsFor(auditoriaId) {
+  return auditoriaChecklistsData.filter((c) => c.auditoriaId === auditoriaId);
+}
+
+function renderAuditCriarLista() {
+  if (!el.auditCriarList) return;
+
+  const term = normalizeText(auditCriarSearchTerm);
+  const list = [...auditoriasData]
+    .filter((a) => {
+      if (!term) return true;
+      const haystack = normalizeText(`${a.auditNumber || ""} ${a.base || ""} ${a.auditType || ""} ${a.client || ""}`);
+      return haystack.includes(term);
+    })
+    .sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")));
+
+  el.auditCriarList.innerHTML = "";
+  if (el.auditCriarEmptyState) el.auditCriarEmptyState.hidden = list.length > 0;
+
+  list.forEach((auditoria) => {
+    const done = auditoriaChecklistsFor(auditoria.id).length;
+    const card = document.createElement("article");
+    card.className = "audit-criar-card";
+    card.innerHTML = `
+      <div class="audit-criar-card-main">
+        <strong>${escapeHtml(auditoria.auditNumber || "Sem número")}</strong>
+        <span>${escapeHtml(auditoria.base || "-")} &bull; ${escapeHtml(auditoria.auditType || "-")} &bull; ${formatAuditDate(auditoria.date)}</span>
+      </div>
+      <span class="audit-status-pill ${done >= AUDIT_CHECKLIST_TEMPLATES.length ? "ok" : done > 0 ? "warning" : "empty"}">
+        ${done}/${AUDIT_CHECKLIST_TEMPLATES.length} checklists
+      </span>
+    `;
+    card.addEventListener("click", () => openAuditCriarPicker(auditoria));
+    el.auditCriarList.appendChild(card);
+  });
+}
+
+function openAuditCriarForm() {
+  if (el.auditCriarForm) el.auditCriarForm.reset();
+  if (el.auditCriarFormMessage) el.auditCriarFormMessage.textContent = "";
+  populateAuditCriarFormOptions();
+  showAuditCriarStep("form");
+}
+
+function openAuditCriarPicker(auditoria) {
+  auditCriarCurrentAuditoria = auditoria;
+  if (el.auditCriarPickerNumero) {
+    el.auditCriarPickerNumero.textContent = `Auditoria ${auditoria.auditNumber || ""} — ${auditoria.base || ""}`;
+  }
+  renderAuditCriarPickerGrid();
+  showAuditCriarStep("picker");
+}
+
+function renderAuditCriarPickerGrid() {
+  if (!el.auditCriarPickerGrid || !auditCriarCurrentAuditoria) return;
+  const done = auditoriaChecklistsFor(auditCriarCurrentAuditoria.id);
+
+  el.auditCriarPickerGrid.innerHTML = "";
+  AUDIT_CHECKLIST_TEMPLATES.forEach((template) => {
+    const existing = done.find((c) => c.checklistCode === template.code);
+    const card = document.createElement("article");
+    card.className = `audit-checklist-card${existing ? " is-done" : ""}`;
+    const totalItems = template.categories.reduce((sum, cat) => sum + cat.items.length, 0);
+    card.innerHTML = `
+      <div class="audit-checklist-card-head">
+        <strong>${escapeHtml(template.name)}</strong>
+        <span class="audit-status-pill ${existing ? "ok" : "empty"}">${existing ? "Concluído" : "Pendente"}</span>
+      </div>
+      <span class="audit-checklist-card-meta">${escapeHtml(template.code)} &bull; ${escapeHtml(template.rev)} &bull; ${totalItems} itens</span>
+      ${existing ? `<span class="audit-checklist-card-meta">Índice de conformidade: ${existing.indiceConformidade ?? "-"}%</span>` : ""}
+    `;
+    card.addEventListener("click", () => openAuditCriarFill(template, existing || null));
+    el.auditCriarPickerGrid.appendChild(card);
+  });
+}
+
+function auditCriarToneClass(status) {
+  if (status === "OK") return "ok";
+  if (status === "NC" || status === "NOK") return "critical";
+  if (status === "OM") return "warning";
+  return "empty";
+}
+
+function openAuditCriarFill(template, existingChecklist) {
+  auditCriarCurrentChecklist = template;
+  auditCriarCurrentValues = {};
+  auditCriarCurrentGrcFields = {};
+
+  if (existingChecklist) {
+    (existingChecklist.items || []).forEach((it) => {
+      auditCriarCurrentValues[it.n] = { status: it.status || "", nota: it.nota || "" };
+    });
+    auditCriarCurrentGrcFields = { ...(existingChecklist.grcFields || {}) };
+  }
+
+  renderAuditCriarFillForm(existingChecklist || null);
+  showAuditCriarStep("fill");
+}
+
+function renderAuditCriarFillForm(existingChecklist) {
+  if (!el.auditCriarFillContainer || !auditCriarCurrentChecklist) return;
+  const template = auditCriarCurrentChecklist;
+  const readOnly = Boolean(existingChecklist);
+  const statusOptions = auditChecklistStatusOptions(template.kind);
+
+  const grcFieldsHtml =
+    template.kind === "grc"
+      ? `<div class="audit-nc-grid audit-criar-grc-fields">
+          ${template.grcFields
+            .map(
+              (f) => `
+            <label class="edit-field">
+              <span>${escapeHtml(f.label)}</span>
+              <input class="input-custom audit-criar-grc-input" data-grc-key="${escapeHtml(f.key)}" value="${escapeHtml(auditCriarCurrentGrcFields[f.key] || "")}" ${readOnly ? "disabled" : ""}>
+            </label>`
+            )
+            .join("")}
+        </div>`
+      : `<label class="edit-field audit-field-wide">
+          <span>Linha/Slot</span>
+          <input id="auditCriarLinhaSlot" class="input-custom" value="${escapeHtml(auditCriarCurrentGrcFields.linhaSlot || "")}" ${readOnly ? "disabled" : ""}>
+        </label>`;
+
+  const itemsHtml = template.categories
+    .map(
+      (cat) => `
+      <div class="audit-criar-category">
+        <h3>${escapeHtml(cat.name)}</h3>
+        ${cat.items
+          .map((item) => {
+            const current = auditCriarCurrentValues[item.n] || { status: "", nota: "" };
+            return `
+            <div class="audit-criar-item" data-item-n="${item.n}">
+              <div class="audit-criar-item-text"><strong>${item.n}.</strong> ${escapeHtml(item.text)}</div>
+              <div class="audit-criar-item-status">
+                ${statusOptions
+                  .map(
+                    (opt) => `
+                  <button type="button" class="audit-criar-status-btn ${auditCriarToneClass(opt)}${current.status === opt ? " active" : ""}"
+                    data-status-value="${opt}" ${readOnly ? "disabled" : ""}>${opt}</button>`
+                  )
+                  .join("")}
+              </div>
+              <textarea class="input-custom audit-criar-item-nota" placeholder="Observação / evidência (obrigatório para ${auditChecklistFindingStatuses(template.kind).join(" e ")})"
+                ${["", ...auditChecklistFindingStatuses(template.kind)].includes(current.status) ? "" : "hidden"} ${readOnly ? "disabled" : ""}>${escapeHtml(current.nota || "")}</textarea>
+            </div>`;
+          })
+          .join("")}
+      </div>`
+    )
+    .join("");
+
+  const footerHtml =
+    template.kind === "spot"
+      ? `
+      <label class="edit-field audit-field-wide">
+        <span>Anotações</span>
+        <textarea id="auditCriarAnotacoes" class="input-custom" rows="3" ${readOnly ? "disabled" : ""}>${escapeHtml(existingChecklist?.observacoes || "")}</textarea>
+      </label>
+      <label class="edit-field audit-field-wide">
+        <span>Itens identificados dentro do prazo de tratativa de auditorias anteriores</span>
+        <textarea id="auditCriarPrazoAnterior" class="input-custom" rows="2" ${readOnly ? "disabled" : ""}>${escapeHtml(existingChecklist?.itensAnterioresPrazo || "")}</textarea>
+      </label>
+      <label class="edit-field audit-field-wide">
+        <span>Itens identificados fora do escopo da auditoria spot</span>
+        <textarea id="auditCriarForaEscopo" class="input-custom" rows="2" ${readOnly ? "disabled" : ""}>${escapeHtml(existingChecklist?.itensForaEscopo || "")}</textarea>
+      </label>
+      <div class="audit-nc-grid">
+        <label class="edit-field"><span>Auditor Responsável</span><input id="auditCriarAssAuditor" class="input-custom" value="${escapeHtml(existingChecklist?.assinaturas?.auditor || auditCriarCurrentAuditoria?.auditorResponsavel || "")}" ${readOnly ? "disabled" : ""}></label>
+        <label class="edit-field"><span>Auditado Responsável</span><input id="auditCriarAssAuditado" class="input-custom" value="${escapeHtml(existingChecklist?.assinaturas?.auditado || auditCriarCurrentAuditoria?.auditadoResponsavel || "")}" ${readOnly ? "disabled" : ""}></label>
+        <label class="edit-field"><span>Observador 1</span><input id="auditCriarAssObs1" class="input-custom" value="${escapeHtml(existingChecklist?.assinaturas?.observador1 || auditCriarCurrentAuditoria?.observador1 || "")}" ${readOnly ? "disabled" : ""}></label>
+        <label class="edit-field"><span>Observador 2</span><input id="auditCriarAssObs2" class="input-custom" value="${escapeHtml(existingChecklist?.assinaturas?.observador2 || auditCriarCurrentAuditoria?.observador2 || "")}" ${readOnly ? "disabled" : ""}></label>
+      </div>`
+      : `
+      <label class="edit-field audit-field-wide">
+        <span>Observações</span>
+        <textarea id="auditCriarAnotacoes" class="input-custom" rows="3" ${readOnly ? "disabled" : ""}>${escapeHtml(existingChecklist?.observacoes || "")}</textarea>
+      </label>
+      <label class="edit-field"><span>Assinatura do Executor</span><input id="auditCriarAssAuditor" class="input-custom" value="${escapeHtml(existingChecklist?.assinaturas?.auditor || "")}" ${readOnly ? "disabled" : ""}></label>`;
+
+  el.auditCriarFillContainer.innerHTML = `
+    <div class="page-heading">
+      <div>
+        <p class="eyebrow">${escapeHtml(template.code)} &bull; ${escapeHtml(template.rev)}</p>
+        <h1>${escapeHtml(template.name)}</h1>
+      </div>
+      ${existingChecklist ? `<span class="audit-status-pill ok">Concluído &bull; índice ${existingChecklist.indiceConformidade ?? "-"}%</span>` : ""}
+    </div>
+    <form id="auditCriarFillForm" class="audit-nc-form audit-criar-fill-form">
+      ${grcFieldsHtml}
+      <div class="audit-criar-items">${itemsHtml}</div>
+      ${footerHtml}
+      <p id="auditCriarFillMessage" class="edit-message"></p>
+      <div class="edit-actions">
+        ${readOnly ? "" : `<button type="submit" id="auditCriarFillSaveBtn" class="modal-action">Concluir checklist</button>`}
+      </div>
+    </form>
+  `;
+
+  if (readOnly) return;
+
+  el.auditCriarFillContainer.querySelectorAll(".audit-criar-item").forEach((itemEl) => {
+    const n = Number(itemEl.dataset.itemN);
+    const notaEl = itemEl.querySelector(".audit-criar-item-nota");
+    itemEl.querySelectorAll(".audit-criar-status-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const value = btn.dataset.statusValue;
+        itemEl.querySelectorAll(".audit-criar-status-btn").forEach((b) => b.classList.toggle("active", b === btn));
+        auditCriarCurrentValues[n] = { ...(auditCriarCurrentValues[n] || {}), status: value };
+        const needsNota = auditChecklistFindingStatuses(template.kind).includes(value);
+        if (notaEl) notaEl.hidden = !needsNota;
+      });
+    });
+    if (notaEl) {
+      notaEl.addEventListener("input", () => {
+        auditCriarCurrentValues[n] = { ...(auditCriarCurrentValues[n] || {}), nota: notaEl.value };
+      });
+    }
+  });
+
+  document.getElementById("auditCriarFillForm")?.addEventListener("submit", handleAuditCriarFillSubmit);
+}
+
+async function handleAuditCriarFillSubmit(event) {
+  event.preventDefault();
+  const template = auditCriarCurrentChecklist;
+  const auditoria = auditCriarCurrentAuditoria;
+  if (!template || !auditoria) return;
+
+  const msgEl = document.getElementById("auditCriarFillMessage");
+  const setMsg = (text) => {
+    if (msgEl) msgEl.textContent = text;
+  };
+
+  const allItems = template.categories.flatMap((cat) => cat.items.map((item) => ({ ...item, categoria: cat.name })));
+  const missing = allItems.filter((item) => !auditCriarCurrentValues[item.n]?.status);
+  if (missing.length) {
+    setMsg(`Marque o status de todos os itens (faltam ${missing.length}).`);
+    return;
+  }
+
+  const findingStatuses = auditChecklistFindingStatuses(template.kind);
+  const missingNota = allItems.filter(
+    (item) => findingStatuses.includes(auditCriarCurrentValues[item.n]?.status) && !auditCriarCurrentValues[item.n]?.nota?.trim()
+  );
+  if (missingNota.length) {
+    setMsg(`Preencha a observação dos itens marcados como ${findingStatuses.join("/")} (item ${missingNota[0].n}).`);
+    return;
+  }
+
+  if (template.kind === "grc") {
+    el.auditCriarFillContainer.querySelectorAll(".audit-criar-grc-input").forEach((input) => {
+      auditCriarCurrentGrcFields[input.dataset.grcKey] = input.value.trim();
+    });
+  } else {
+    auditCriarCurrentGrcFields.linhaSlot = document.getElementById("auditCriarLinhaSlot")?.value.trim() || "";
+  }
+
+  const saveBtn = document.getElementById("auditCriarFillSaveBtn");
+  if (saveBtn) saveBtn.disabled = true;
+  setMsg("Salvando checklist...");
+
+  try {
+    const okCount = allItems.filter((item) => auditCriarCurrentValues[item.n].status === "OK").length;
+    const omCount = allItems.filter((item) => auditCriarCurrentValues[item.n].status === "OM").length;
+    const ncCount = allItems.filter((item) => ["NC", "NOK"].includes(auditCriarCurrentValues[item.n].status)).length;
+    const naCount = allItems.filter((item) => auditCriarCurrentValues[item.n].status === "N/A").length;
+    const applicable = allItems.length - naCount;
+    const indiceConformidade = applicable > 0 ? Math.round((okCount / applicable) * 100) : 0;
+
+    const items = allItems.map((item) => ({
+      n: item.n,
+      categoria: item.categoria,
+      descricao: item.text,
+      status: auditCriarCurrentValues[item.n].status,
+      nota: auditCriarCurrentValues[item.n].nota || ""
+    }));
+
+    const checklistPayload = {
+      auditoriaId: auditoria.id,
+      auditNumber: auditoria.auditNumber || "",
+      checklistCode: template.code,
+      checklistName: template.name,
+      items,
+      grcFields: template.kind === "grc" ? { ...auditCriarCurrentGrcFields } : {},
+      observacoes: document.getElementById("auditCriarAnotacoes")?.value.trim() || "",
+      itensAnterioresPrazo: document.getElementById("auditCriarPrazoAnterior")?.value.trim() || "",
+      itensForaEscopo: document.getElementById("auditCriarForaEscopo")?.value.trim() || "",
+      assinaturas: {
+        auditor: document.getElementById("auditCriarAssAuditor")?.value.trim() || "",
+        auditado: document.getElementById("auditCriarAssAuditado")?.value.trim() || "",
+        observador1: document.getElementById("auditCriarAssObs1")?.value.trim() || "",
+        observador2: document.getElementById("auditCriarAssObs2")?.value.trim() || ""
+      },
+      okCount,
+      omCount,
+      ncCount,
+      naCount,
+      indiceConformidade,
+      createdAt: new Date().toISOString(),
+      createdBy: auth.currentUser?.email || ""
+    };
+
+    const ref = await addDoc(collection(db, "auditoria_checklists"), checklistPayload);
+    auditoriaChecklistsData.push({ id: ref.id, ...checklistPayload });
+
+    const findings = allItems.filter((item) => findingStatuses.includes(auditCriarCurrentValues[item.n].status));
+    for (const item of findings) {
+      const value = auditCriarCurrentValues[item.n];
+      const type = value.status === "NOK" ? "NC" : value.status;
+      const ncNumber = `${template.code}-${auditoria.auditNumber || "SN"}-${item.n}`;
+      await addAuditNc({
+        description: value.nota ? `${item.text} — Nota do auditor: ${value.nota}` : item.text,
+        auditType: auditoria.auditType || "",
+        client: auditoria.client || "",
+        auditNumber: auditoria.auditNumber || "",
+        type,
+        ncNumber,
+        base: auditoria.base || "",
+        status: "Open",
+        step: "Open",
+        riskAnalysis: "",
+        recurrentNc: "No",
+        needsInvestment: "No",
+        ncDate: auditoria.date || "",
+        year: (auditoria.date || "").slice(0, 4),
+        ncDept: template.ncDept,
+        ncSector: item.categoria,
+        responsableSector: "",
+        rootCauseDescription: "",
+        rootCauseCode: "",
+        pacResponsibleName: "",
+        deadline: "",
+        extension1: "",
+        extension2: "",
+        ncClosureDate: "",
+        highlight: ""
+      });
+    }
+
+    setMsg("");
+    alert(
+      findings.length
+        ? `Checklist concluído! ${findings.length} não conformidade(s)/oportunidade(s) foram criadas na Operação de Auditoria.`
+        : "Checklist concluído! Nenhum item fora de conformidade."
+    );
+    openAuditCriarPicker(auditoria);
+  } catch (err) {
+    console.error("Erro ao salvar checklist.", err);
+    setMsg(`Não foi possível salvar o checklist: "${err?.message || err}".`);
+  } finally {
+    if (saveBtn) saveBtn.disabled = false;
+  }
+}
+
+el.auditCriarSearch?.addEventListener("input", () => {
+  auditCriarSearchTerm = el.auditCriarSearch.value || "";
+  renderAuditCriarLista();
+});
+
+el.auditCriarNewBtn?.addEventListener("click", openAuditCriarForm);
+el.auditCriarFormBackBtn?.addEventListener("click", () => showAuditCriarStep("lista"));
+el.auditCriarCancelBtn?.addEventListener("click", () => showAuditCriarStep("lista"));
+el.auditCriarPickerBackBtn?.addEventListener("click", () => {
+  renderAuditCriarLista();
+  showAuditCriarStep("lista");
+});
+el.auditCriarFillBackBtn?.addEventListener("click", () => {
+  renderAuditCriarPickerGrid();
+  showAuditCriarStep("picker");
+});
+
+el.auditCriarForm?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const auditNumber = el.auditCriarNumero.value.trim();
+  if (!auditNumber) {
+    if (el.auditCriarFormMessage) el.auditCriarFormMessage.textContent = "Informe o N° da auditoria.";
+    return;
+  }
+
+  if (el.auditCriarSaveBtn) el.auditCriarSaveBtn.disabled = true;
+  if (el.auditCriarFormMessage) el.auditCriarFormMessage.textContent = "Criando auditoria...";
+
+  try {
+    const payload = {
+      auditNumber,
+      base: el.auditCriarBase.value || "",
+      date: el.auditCriarData.value || "",
+      auditType: el.auditCriarTipo.value || "",
+      client: el.auditCriarCliente.value || "",
+      auditorResponsavel: el.auditCriarAuditor.value.trim(),
+      auditadoResponsavel: el.auditCriarAuditado.value.trim(),
+      observador1: el.auditCriarObs1.value.trim(),
+      observador2: el.auditCriarObs2.value.trim(),
+      createdAt: new Date().toISOString(),
+      createdBy: auth.currentUser?.email || ""
+    };
+    const ref = await addDoc(collection(db, "auditorias"), payload);
+    const auditoria = { id: ref.id, ...payload };
+    auditoriasData.push(auditoria);
+    openAuditCriarPicker(auditoria);
+  } catch (err) {
+    console.error("Erro ao criar auditoria.", err);
+    if (el.auditCriarFormMessage) el.auditCriarFormMessage.textContent = `Não foi possível criar a auditoria: "${err?.message || err}".`;
+  } finally {
+    if (el.auditCriarSaveBtn) el.auditCriarSaveBtn.disabled = false;
+  }
+});
 
 function renderHistorico() {
   if (!el.timeline) return;
@@ -4630,14 +5420,94 @@ function renderAdminPanel() {
   renderAdminSiteTree();
   renderAdminAreaList();
   renderAdScopeSummary();
+  renderAdminApprovals();
   renderAdminUsers();
+}
+
+async function approveAdminUser(uid) {
+  try {
+    await updateDoc(doc(db, "usuarios", uid), { aprovado: true, aprovadoEm: new Date().toISOString() });
+    await carregarUsuariosAdmin();
+    renderAdminApprovals();
+    renderAdminUsers();
+  } catch (err) {
+    console.error("Não foi possível aprovar o usuário.", err);
+    alert("Não foi possível aprovar este usuário. Verifique as regras do Firestore.");
+  }
+}
+
+async function rejectAdminUser(uid) {
+  if (!confirm("Recusar o acesso deste usuário? Ele continuará sem conseguir entrar no site.")) return;
+  try {
+    await updateDoc(doc(db, "usuarios", uid), { aprovado: false, recusado: true, recusadoEm: new Date().toISOString() });
+    await carregarUsuariosAdmin();
+    renderAdminApprovals();
+    renderAdminUsers();
+  } catch (err) {
+    console.error("Não foi possível recusar o usuário.", err);
+    alert("Não foi possível recusar este usuário. Verifique as regras do Firestore.");
+  }
+}
+
+function renderAdminApprovals() {
+  if (!el.adminApprovalsList) return;
+  el.adminApprovalsList.textContent = "";
+
+  const pending = adminUsers
+    .filter((user) => user.aprovado === false && !user.recusado)
+    .sort((a, b) => new Date(b.criadoEm || 0) - new Date(a.criadoEm || 0));
+
+  if (el.adminApprovalsCount) {
+    el.adminApprovalsCount.textContent = pending.length === 1 ? "1 pendente" : `${pending.length} pendentes`;
+  }
+
+  if (!pending.length) {
+    const empty = document.createElement("div");
+    empty.className = "admin-users-empty";
+    empty.textContent = "Nenhuma solicitação de acesso pendente.";
+    el.adminApprovalsList.appendChild(empty);
+    return;
+  }
+
+  pending.forEach((user) => {
+    const row = document.createElement("article");
+    row.className = "admin-approval-row";
+
+    const content = document.createElement("div");
+    const email = document.createElement("strong");
+    email.textContent = user.email || "Usuário sem e-mail";
+    const meta = document.createElement("span");
+    meta.textContent = user.criadoEm ? `Solicitado em ${formatAuditDate(user.criadoEm.slice(0, 10))}` : "Data não registrada";
+    content.append(email, meta);
+
+    const actions = document.createElement("div");
+    actions.className = "admin-approval-actions";
+
+    const approveBtn = document.createElement("button");
+    approveBtn.type = "button";
+    approveBtn.className = "modal-action";
+    approveBtn.textContent = "Aprovar";
+    approveBtn.addEventListener("click", () => approveAdminUser(user.id));
+
+    const rejectBtn = document.createElement("button");
+    rejectBtn.type = "button";
+    rejectBtn.className = "modal-action secondary audit-delete-btn";
+    rejectBtn.textContent = "Recusar";
+    rejectBtn.addEventListener("click", () => rejectAdminUser(user.id));
+
+    actions.append(approveBtn, rejectBtn);
+    row.append(content, actions);
+    el.adminApprovalsList.appendChild(row);
+  });
 }
 
 function renderAdminUsers() {
   if (!el.adminUsersList) return;
   el.adminUsersList.textContent = "";
 
-  if (!adminUsers.length) {
+  const knownUsers = adminUsers.filter((user) => user.aprovado !== false);
+
+  if (!knownUsers.length) {
     const empty = document.createElement("div");
     empty.className = "admin-users-empty";
     empty.textContent = "Nenhum usuário registrado nesta lista ainda.";
@@ -4645,7 +5515,7 @@ function renderAdminUsers() {
     return;
   }
 
-  const users = [...adminUsers].sort((a, b) => new Date(b.ultimoOnlineISO || 0) - new Date(a.ultimoOnlineISO || 0));
+  const users = [...knownUsers].sort((a, b) => new Date(b.ultimoOnlineISO || 0) - new Date(a.ultimoOnlineISO || 0));
   users.forEach((user) => {
     const row = document.createElement("article");
     row.className = "admin-user-row";
@@ -6582,6 +7452,7 @@ window.showTab = function (tab) {
   if (tab === "adNotificacoes") renderAdNotifications();
   if (tab === "auditoriaDashboard") openAuditoriaDashboardTab();
   if (tab === "auditoriaOperacao") openAuditoriaOperacaoTab();
+  if (tab === "auditoriaCriar") openAuditoriaCriarTab();
   if (tab === "publicacoes") {
     renderPublicationNetwork();
     startPublicationFloat();

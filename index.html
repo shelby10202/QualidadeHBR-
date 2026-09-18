@@ -130,6 +130,13 @@
 
       <div class="gh-nav-group">
         <p class="gh-nav-label">Auditoria</p>
+        <button type="button" class="gh-nav-item" data-tab-target="auditoriaCriar" onclick="showTab('auditoriaCriar')">
+          <svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 5v14"></path>
+            <path d="M5 12h14"></path>
+          </svg>
+          Criar Auditoria
+        </button>
         <button type="button" class="gh-nav-item" data-tab-target="auditoriaDashboard" onclick="showTab('auditoriaDashboard')">
           <svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <line x1="18" y1="20" x2="18" y2="10"></line>
@@ -703,6 +710,14 @@
             <p id="documentImportMessage" class="edit-message"></p>
           </article>
 
+          <article class="admin-panel admin-approvals-panel">
+            <div class="admin-panel-head">
+              <span>Aprovação de usuários</span>
+              <strong id="adminApprovalsCount">0 pendentes</strong>
+            </div>
+            <div id="adminApprovalsList" class="admin-approvals-list"></div>
+          </article>
+
           <article class="admin-panel admin-users-panel">
             <div class="admin-panel-head">
               <span>Usuários</span>
@@ -743,6 +758,94 @@
             <div id="adminHistoryList" class="admin-history-list"></div>
           </article>
         </div>
+      </div>
+    </section>
+
+    <section id="auditoriaCriar" class="tab">
+      <div id="audit_criar_error" class="audit-error-banner" hidden></div>
+      <div class="page-heading">
+        <div>
+          <p class="eyebrow">Auditoria</p>
+          <h1>Criar Auditoria</h1>
+          <p class="page-subtitle">Abra uma auditoria, preencha os checklists de cada setor e as não conformidades vão automaticamente para a Operação.</p>
+        </div>
+      </div>
+
+      <div id="auditCriarStepLista">
+        <div class="gallery-toolbar">
+          <div class="search-box">
+            <input id="auditCriarSearch" type="search" placeholder="Buscar por N° da auditoria, base, tipo...">
+          </div>
+          <button type="button" id="auditCriarNewBtn" class="modal-action audit-new-btn">Nova auditoria</button>
+        </div>
+        <div id="auditCriarList" class="audit-criar-list"></div>
+        <div id="auditCriarEmptyState" class="empty-state" hidden>Nenhuma auditoria criada ainda.</div>
+      </div>
+
+      <div id="auditCriarStepForm" hidden>
+        <button type="button" id="auditCriarFormBackBtn" class="audit-back-btn">&larr; Voltar</button>
+        <form id="auditCriarForm" class="audit-nc-form audit-criar-form">
+          <div class="audit-nc-grid">
+            <label class="edit-field">
+              <span>N° Auditoria *</span>
+              <input id="auditCriarNumero" class="input-custom" required>
+            </label>
+            <label class="edit-field">
+              <span>Base</span>
+              <select id="auditCriarBase" class="input-custom"></select>
+            </label>
+            <label class="edit-field">
+              <span>Data</span>
+              <input id="auditCriarData" type="date" class="input-custom">
+            </label>
+            <label class="edit-field">
+              <span>Tipo de Auditoria</span>
+              <select id="auditCriarTipo" class="input-custom"></select>
+            </label>
+            <label class="edit-field">
+              <span>Cliente</span>
+              <select id="auditCriarCliente" class="input-custom"></select>
+            </label>
+            <label class="edit-field">
+              <span>Auditor Responsável</span>
+              <input id="auditCriarAuditor" class="input-custom">
+            </label>
+            <label class="edit-field">
+              <span>Auditado Responsável</span>
+              <input id="auditCriarAuditado" class="input-custom">
+            </label>
+            <label class="edit-field">
+              <span>Observador 1</span>
+              <input id="auditCriarObs1" class="input-custom">
+            </label>
+            <label class="edit-field">
+              <span>Observador 2</span>
+              <input id="auditCriarObs2" class="input-custom">
+            </label>
+          </div>
+          <p id="auditCriarFormMessage" class="edit-message"></p>
+          <div class="edit-actions">
+            <button type="button" id="auditCriarCancelBtn" class="modal-action secondary">Cancelar</button>
+            <button type="submit" id="auditCriarSaveBtn" class="modal-action">Criar e continuar</button>
+          </div>
+        </form>
+      </div>
+
+      <div id="auditCriarStepPicker" hidden>
+        <button type="button" id="auditCriarPickerBackBtn" class="audit-back-btn">&larr; Voltar para auditorias</button>
+        <div class="page-heading">
+          <div>
+            <p class="eyebrow" id="auditCriarPickerNumero">Auditoria</p>
+            <h1>Escolha o checklist</h1>
+            <p class="page-subtitle">Preencha um checklist por setor visitado nesta auditoria.</p>
+          </div>
+        </div>
+        <div id="auditCriarPickerGrid" class="audit-checklist-grid"></div>
+      </div>
+
+      <div id="auditCriarStepFill" hidden>
+        <button type="button" id="auditCriarFillBackBtn" class="audit-back-btn">&larr; Voltar para checklists</button>
+        <div id="auditCriarFillContainer"></div>
       </div>
     </section>
 
@@ -889,6 +992,10 @@
         <div class="search-box">
           <input id="auditSearch" type="search" placeholder="Buscar NC, descrição, base, setor...">
         </div>
+
+        <select id="auditNumberFilter" class="input-custom audit-number-filter">
+          <option value="">Todas as auditorias</option>
+        </select>
 
         <button type="button" id="auditNewBtn" class="modal-action audit-new-btn">Nova não conformidade</button>
       </div>
