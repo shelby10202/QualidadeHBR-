@@ -1,6 +1,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { getFirestore, collection, addDoc, getDocs, getDoc, deleteDoc, doc, updateDoc, setDoc, writeBatch } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+import { getStorage, ref as storageRef, uploadBytes, getDownloadURL, deleteObject } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyAZ6gOO32DstTL9LPSgtYYa3Jptq_8QNrs",
@@ -14,6 +15,7 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
+const storage = getStorage(app);
 
 const AIRCRAFT_LIBRARY = [
   {
@@ -925,19 +927,36 @@ const el = {
   auditCriarForm: document.getElementById("auditCriarForm"),
   auditCriarNumero: document.getElementById("auditCriarNumero"),
   auditCriarBase: document.getElementById("auditCriarBase"),
-  auditCriarData: document.getElementById("auditCriarData"),
+  auditCriarDataInicio: document.getElementById("auditCriarDataInicio"),
+  auditCriarDataFim: document.getElementById("auditCriarDataFim"),
   auditCriarTipo: document.getElementById("auditCriarTipo"),
   auditCriarCliente: document.getElementById("auditCriarCliente"),
+  auditCriarStatus: document.getElementById("auditCriarStatus"),
   auditCriarAuditor: document.getElementById("auditCriarAuditor"),
   auditCriarAuditado: document.getElementById("auditCriarAuditado"),
+  auditCriarEquipe: document.getElementById("auditCriarEquipe"),
   auditCriarObs1: document.getElementById("auditCriarObs1"),
   auditCriarObs2: document.getElementById("auditCriarObs2"),
+  auditCriarNumColaboradores: document.getElementById("auditCriarNumColaboradores"),
+  auditCriarNumAeronavesEo: document.getElementById("auditCriarNumAeronavesEo"),
+  auditCriarNumAeronavesManut: document.getElementById("auditCriarNumAeronavesManut"),
+  auditCriarObjetivo: document.getElementById("auditCriarObjetivo"),
+  auditCriarEscopo: document.getElementById("auditCriarEscopo"),
   auditCriarFormMessage: document.getElementById("auditCriarFormMessage"),
   auditCriarCancelBtn: document.getElementById("auditCriarCancelBtn"),
   auditCriarSaveBtn: document.getElementById("auditCriarSaveBtn"),
   auditCriarPickerBackBtn: document.getElementById("auditCriarPickerBackBtn"),
   auditCriarPickerNumero: document.getElementById("auditCriarPickerNumero"),
   auditCriarPickerGrid: document.getElementById("auditCriarPickerGrid"),
+  auditCriarPickerStatus: document.getElementById("auditCriarPickerStatus"),
+  auditCriarReportBtn: document.getElementById("auditCriarReportBtn"),
+  auditCriarResumo: document.getElementById("auditCriarResumo"),
+  auditCriarObservacoesGerais: document.getElementById("auditCriarObservacoesGerais"),
+  auditCriarSummarySaveBtn: document.getElementById("auditCriarSummarySaveBtn"),
+  auditCriarSummaryMessage: document.getElementById("auditCriarSummaryMessage"),
+  auditCriarPhotoInput: document.getElementById("auditCriarPhotoInput"),
+  auditCriarPhotoMessage: document.getElementById("auditCriarPhotoMessage"),
+  auditCriarPhotoGrid: document.getElementById("auditCriarPhotoGrid"),
   auditCriarFillBackBtn: document.getElementById("auditCriarFillBackBtn"),
   auditCriarFillContainer: document.getElementById("auditCriarFillContainer"),
   auditMetricTotal: document.getElementById("audit_metric_total"),
@@ -968,6 +987,10 @@ const el = {
   auditNcSaveBtn: document.getElementById("auditNcSaveBtn"),
   auditNcDeleteBtn: document.getElementById("auditNcDeleteBtn"),
   auditNcEmitBtn: document.getElementById("auditNcEmitBtn"),
+  auditNcPhotoUploadLabel: document.getElementById("auditNcPhotoUploadLabel"),
+  auditNcPhotoInput: document.getElementById("auditNcPhotoInput"),
+  auditNcPhotoMessage: document.getElementById("auditNcPhotoMessage"),
+  auditNcPhotoGrid: document.getElementById("auditNcPhotoGrid"),
   auditNcMessage: document.getElementById("auditNcMessage"),
   auditNcDescription: document.getElementById("auditNcDescription"),
   auditNcAuditType: document.getElementById("auditNcAuditType"),
@@ -1457,6 +1480,12 @@ function formatAuditDate(value) {
   return `${d}/${m}/${y}`;
 }
 
+function formatAuditPeriod(dateStart, dateEnd) {
+  if (!dateStart && !dateEnd) return "";
+  if (dateStart && dateEnd && dateStart !== dateEnd) return `${formatAuditDate(dateStart)} a ${formatAuditDate(dateEnd)}`;
+  return formatAuditDate(dateStart || dateEnd);
+}
+
 function formatAuditDateForDoc(value) {
   const formatted = formatAuditDate(value);
   return formatted === "-" ? "" : formatted;
@@ -1539,6 +1568,195 @@ async function emitFq071(item, triggerBtn) {
     if (triggerBtn) triggerBtn.disabled = false;
   }
 }
+
+// ===================== FQ-073 - Relatório de Auditoria completo =====================
+
+const FQ073_TEMPLATE_URL = "fq073-template.docx";
+
+function fq073LibsReady() {
+  return typeof window.PizZip !== "undefined" && typeof window.docxtemplater !== "undefined" && typeof window.ImageModule !== "undefined";
+}
+
+function classifyRiskBucket(text) {
+  const n = normalizeText(text || "");
+  if (!n) return null;
+  if (n.includes("extrem")) return "extrema";
+  if (n.includes("alt")) return "alta";
+  if (n.includes("medi")) return "media";
+  if (n.includes("baix")) return "baixa";
+  return null;
+}
+
+async function fetchImageArrayBuffer(url) {
+  try {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return await res.arrayBuffer();
+  } catch (err) {
+    console.error("Erro ao baixar foto para o relatório:", url, err);
+    return null;
+  }
+}
+
+async function buildFq073Data(auditoria) {
+  const relatedNcs = auditNcData.filter((item) => item.auditNumber === auditoria.auditNumber);
+  const ncsRaw = relatedNcs.filter((item) => normalizeText(item.type || "").startsWith("nc"));
+  const omsRaw = relatedNcs.filter((item) => normalizeText(item.type || "") === "om");
+
+  const ncs = ncsRaw.map((item, index) => {
+    const setor = [item.ncDept, item.ncSector].map((v) => (v || "").trim()).filter(Boolean).join(" / ");
+    return {
+      numero: String(index + 1).padStart(3, "0"),
+      setorArea: `${setor || "-"}${item.ncNumber ? ` — Ref: ${item.ncNumber}` : ""}`,
+      evidenciaObjetiva: item.description || "",
+      requisito: "",
+      avaliacaoRisco: item.riskAnalysis || "",
+      prazo: formatAuditDateForDoc(item.deadline),
+      _record: item
+    };
+  });
+
+  const oms = omsRaw.map((item, index) => ({
+    numero: String(index + 1).padStart(3, "0"),
+    texto: item.description || ""
+  }));
+
+  const observacoesLines = (auditoria.observacoesGerais || "")
+    .split("\n")
+    .map((l) => l.trim())
+    .filter(Boolean);
+  const observacoes = observacoesLines.map((texto, index) => ({ numero: String(index + 1).padStart(3, "0"), texto }));
+
+  const criticidade = { baixa: 0, media: 0, alta: 0, extrema: 0 };
+  ncsRaw.forEach((item) => {
+    const bucket = classifyRiskBucket(item.riskAnalysis);
+    if (bucket) criticidade[bucket] += 1;
+  });
+
+  const checklists = auditoriaChecklistsFor(auditoria.id);
+  const relatorioConformidades = checklists.length
+    ? checklists
+        .map((c) => {
+          const template = AUDIT_CHECKLIST_TEMPLATES.find((t) => t.code === c.checklistCode);
+          const nome = template ? template.name : c.checklistCode;
+          return `${c.checklistCode} – ${nome}: ${c.indiceConformidade ?? "-"}% de conformidade (OK: ${c.okCount ?? 0}, NC: ${c.ncCount ?? 0}, OM: ${c.omCount ?? 0}, N/A: ${c.naCount ?? 0})`;
+        })
+        .join("\n")
+    : "Nenhum checklist de setor foi preenchido para esta auditoria até o momento.";
+
+  // ---------- Photos: NC photos + general audit photos, pre-fetched as image bytes ----------
+  const imageMap = {};
+  const fotosAnexo = [];
+  let photoCounter = 0;
+
+  const addPhotoEntries = async (fotos, legendaPrefix) => {
+    if (!fotos || !fotos.length) return;
+    for (let i = 0; i < fotos.length; i += 1) {
+      const foto = fotos[i];
+      const buffer = await fetchImageArrayBuffer(foto.url);
+      if (!buffer) continue;
+      const key = `photo_${photoCounter++}`;
+      imageMap[key] = buffer;
+      fotosAnexo.push({ foto: key, legenda: `${legendaPrefix} — Foto ${i + 1}` });
+    }
+  };
+
+  await addPhotoEntries(auditoria.fotos, `Auditoria ${auditoria.auditNumber || ""} (geral)`);
+  for (const nc of ncs) {
+    await addPhotoEntries(nc._record.fotos, `NC${nc.numero} (${nc._record.ncNumber || ""})`);
+  }
+  ncs.forEach((nc) => delete nc._record);
+
+  const data = {
+    auditNumber: auditoria.auditNumber || "",
+    localidade: auditoria.base || "",
+    periodo: formatAuditPeriod(auditoria.dateStart, auditoria.dateEnd) || "",
+    objetivo: auditoria.objetivo || "",
+    escopo: auditoria.escopo || "",
+    tipoAuditoria: auditoria.auditType || "",
+    auditores: auditoria.auditorResponsavel || "",
+    observadores: [auditoria.observador1, auditoria.observador2].filter(Boolean).join(", "),
+    equipeAuditada: auditoria.equipeAuditada || "",
+    numColaboradores: auditoria.numColaboradores || "",
+    numAeronavesEo: auditoria.numAeronavesEo || "",
+    numAeronavesManut: auditoria.numAeronavesManut || "",
+    totalNc: String(ncs.length),
+    totalReincidentes: String(ncsRaw.filter((item) => item.recurrentNc === "Yes").length),
+    totalOm: String(oms.length),
+    totalObservacoes: String(observacoes.length),
+    qtdeBaixa: String(criticidade.baixa),
+    qtdeMedia: String(criticidade.media),
+    qtdeAlta: String(criticidade.alta),
+    qtdeExtrema: String(criticidade.extrema),
+    resumoAuditoria: auditoria.resumoAuditoria || "",
+    ncs,
+    oms,
+    observacoes,
+    relatorioConformidades,
+    elaboradoPorNome: auditoria.auditorResponsavel || auth.currentUser?.email || "",
+    elaboradoPorData: formatAuditDateForDoc(new Date().toISOString().slice(0, 10)),
+    fotosAnexo
+  };
+
+  return { data, imageMap };
+}
+
+async function emitFq073Report(auditoria, triggerBtn) {
+  if (!auditoria) return;
+
+  if (!fq073LibsReady()) {
+    alert("As bibliotecas de geração de Word ainda não carregaram. Aguarde alguns segundos e tente novamente.");
+    return;
+  }
+
+  if (triggerBtn) triggerBtn.disabled = true;
+  const originalLabel = triggerBtn ? triggerBtn.textContent : "";
+  if (triggerBtn) triggerBtn.textContent = "Gerando relatório...";
+
+  try {
+    const res = await fetch(FQ073_TEMPLATE_URL);
+    if (!res.ok) throw new Error(`HTTP ${res.status} ao buscar ${FQ073_TEMPLATE_URL}`);
+    const templateBuffer = await res.arrayBuffer();
+
+    const { data, imageMap } = await buildFq073Data(auditoria);
+
+    const imageModule = new window.ImageModule({
+      centered: true,
+      getImage: (tagValue) => imageMap[tagValue],
+      getSize: () => [360, 270]
+    });
+
+    const zip = new window.PizZip(templateBuffer);
+    const doc = new window.docxtemplater(zip, { paragraphLoop: true, linebreaks: true, modules: [imageModule] });
+    doc.render(data);
+
+    const blob = doc.toBlob();
+    const url = URL.createObjectURL(blob);
+    const safeNumber = String(auditoria.auditNumber || "auditoria").replace(/[^\w-]+/g, "_");
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `FQ-073_${safeNumber}.docx`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
+  } catch (err) {
+    console.error("Erro ao gerar FQ-073:", err);
+    alert(
+      `Não foi possível gerar o Relatório de Auditoria: "${err?.message || err}". Confira se o arquivo "fq073-template.docx" está na mesma pasta do index.html, e se o Firebase Storage está com as regras/CORS liberados para as fotos.`
+    );
+  } finally {
+    if (triggerBtn) {
+      triggerBtn.disabled = false;
+      triggerBtn.textContent = originalLabel;
+    }
+  }
+}
+
+el.auditCriarReportBtn?.addEventListener("click", () => {
+  if (!auditCriarCurrentAuditoria) return;
+  emitFq073Report(auditCriarCurrentAuditoria, el.auditCriarReportBtn);
+});
 
 function auditStatusToneClass(status) {
   if (status === "Done") return "ok";
@@ -1682,9 +1900,71 @@ function openAuditNcModal(id) {
   }
   if (el.auditNcDeleteBtn) el.auditNcDeleteBtn.hidden = !record;
   if (el.auditNcEmitBtn) el.auditNcEmitBtn.hidden = !record;
+  if (el.auditNcPhotoUploadLabel) el.auditNcPhotoUploadLabel.hidden = !record;
+  if (el.auditNcPhotoMessage) el.auditNcPhotoMessage.textContent = record ? "" : "Salve a não conformidade antes de adicionar fotos.";
+  renderAuditNcPhotoGrid(record);
   if (el.auditNcMessage) el.auditNcMessage.textContent = "";
   el.auditNcModal.hidden = false;
 }
+
+function renderAuditNcPhotoGrid(record) {
+  if (!el.auditNcPhotoGrid) return;
+  const fotos = record?.fotos || [];
+  el.auditNcPhotoGrid.innerHTML = "";
+  if (!fotos.length) {
+    el.auditNcPhotoGrid.innerHTML = `<p class="audit-photo-empty">${record ? "Nenhuma foto adicionada ainda." : ""}</p>`;
+    return;
+  }
+  fotos.forEach((foto, index) => {
+    const item = document.createElement("div");
+    item.className = "audit-photo-item";
+    item.innerHTML = `
+      <img src="${escapeHtml(foto.url)}" alt="Foto da não conformidade" loading="lazy">
+      <button type="button" class="audit-photo-remove" title="Remover foto">&times;</button>
+    `;
+    item.querySelector(".audit-photo-remove")?.addEventListener("click", () => removeAuditNcPhoto(index));
+    el.auditNcPhotoGrid.appendChild(item);
+  });
+}
+
+async function removeAuditNcPhoto(index) {
+  if (!auditNcEditingId) return;
+  const record = auditNcData.find((item) => item.id === auditNcEditingId);
+  if (!record) return;
+  const fotos = [...(record.fotos || [])];
+  const [removed] = fotos.splice(index, 1);
+  if (!removed) return;
+  if (!confirm("Remover esta foto da não conformidade?")) return;
+  try {
+    await updateAuditNcRecord(auditNcEditingId, { fotos });
+    await deletePhotoFromStorage(removed);
+    renderAuditNcPhotoGrid(auditNcData.find((item) => item.id === auditNcEditingId));
+  } catch (err) {
+    console.error("Erro ao remover foto da NC.", err);
+    alert(`Não foi possível remover a foto: "${err?.message || err}".`);
+  }
+}
+
+el.auditNcPhotoInput?.addEventListener("change", async () => {
+  if (!auditNcEditingId || !el.auditNcPhotoInput.files?.length) return;
+  const record = auditNcData.find((item) => item.id === auditNcEditingId);
+  const files = Array.from(el.auditNcPhotoInput.files);
+  if (el.auditNcPhotoMessage) el.auditNcPhotoMessage.textContent = "Enviando fotos...";
+  try {
+    const uploaded = await uploadPhotosToStorage(files, `nao_conformidades/${auditNcEditingId}`);
+    const fotos = [...(record?.fotos || []), ...uploaded];
+    await updateAuditNcRecord(auditNcEditingId, { fotos });
+    if (el.auditNcPhotoMessage) el.auditNcPhotoMessage.textContent = "";
+    renderAuditNcPhotoGrid(auditNcData.find((item) => item.id === auditNcEditingId));
+  } catch (err) {
+    console.error("Erro ao enviar fotos da NC.", err);
+    if (el.auditNcPhotoMessage) {
+      el.auditNcPhotoMessage.textContent = `Não foi possível enviar as fotos: "${err?.message || err}". Verifique se o Firebase Storage está habilitado e com as regras liberadas.`;
+    }
+  } finally {
+    el.auditNcPhotoInput.value = "";
+  }
+});
 
 function closeAuditNcModal() {
   if (el.auditNcModal) el.auditNcModal.hidden = true;
@@ -2007,12 +2287,14 @@ function renderAuditCriarLista() {
     const done = auditoriaChecklistsFor(auditoria.id).length;
     const card = document.createElement("article");
     card.className = "audit-criar-card";
+    const status = auditoria.status || "Em Progresso";
     card.innerHTML = `
       <div class="audit-criar-card-main">
         <strong>${escapeHtml(auditoria.auditNumber || "Sem número")}</strong>
-        <span>${escapeHtml(auditoria.base || "-")} &bull; ${escapeHtml(auditoria.auditType || "-")} &bull; ${formatAuditDate(auditoria.date)}</span>
+        <span>${escapeHtml(auditoria.base || "-")} &bull; ${escapeHtml(auditoria.auditType || "-")} &bull; ${escapeHtml(formatAuditPeriod(auditoria.dateStart, auditoria.dateEnd) || "-")}</span>
       </div>
       <div class="audit-criar-card-side">
+        <span class="audit-status-pill ${auditoriaStatusToneClass(status)}">${escapeHtml(status)}</span>
         <span class="audit-status-pill ${done >= AUDIT_CHECKLIST_TEMPLATES.length ? "ok" : done > 0 ? "warning" : "empty"}">
           ${done}/${AUDIT_CHECKLIST_TEMPLATES.length} checklists
         </span>
@@ -2051,18 +2333,162 @@ async function deleteAuditoria(auditoria) {
 function openAuditCriarForm() {
   if (el.auditCriarForm) el.auditCriarForm.reset();
   if (el.auditCriarFormMessage) el.auditCriarFormMessage.textContent = "";
+  const todayStr = new Date().toISOString().slice(0, 10);
+  if (el.auditCriarDataInicio) {
+    el.auditCriarDataInicio.min = todayStr;
+    el.auditCriarDataInicio.value = todayStr;
+  }
+  if (el.auditCriarDataFim) {
+    el.auditCriarDataFim.min = todayStr;
+    el.auditCriarDataFim.value = todayStr;
+  }
+  if (el.auditCriarStatus) el.auditCriarStatus.value = "Em Progresso";
   populateAuditCriarFormOptions();
   showAuditCriarStep("form");
+}
+
+function auditoriaStatusToneClass(status) {
+  if (status === "Concluída") return "ok";
+  if (status === "Cancelada") return "critical";
+  return "warning";
 }
 
 function openAuditCriarPicker(auditoria) {
   auditCriarCurrentAuditoria = auditoria;
   if (el.auditCriarPickerNumero) {
-    el.auditCriarPickerNumero.textContent = `Auditoria ${auditoria.auditNumber || ""} — ${auditoria.base || ""}`;
+    const periodo = formatAuditPeriod(auditoria.dateStart, auditoria.dateEnd);
+    el.auditCriarPickerNumero.textContent = `Auditoria ${auditoria.auditNumber || ""} — ${auditoria.base || ""}${periodo ? ` — ${periodo}` : ""}`;
   }
+  if (el.auditCriarPickerStatus) el.auditCriarPickerStatus.value = auditoria.status || "Em Progresso";
+  if (el.auditCriarResumo) el.auditCriarResumo.value = auditoria.resumoAuditoria || "";
+  if (el.auditCriarObservacoesGerais) el.auditCriarObservacoesGerais.value = auditoria.observacoesGerais || "";
+  if (el.auditCriarSummaryMessage) el.auditCriarSummaryMessage.textContent = "";
+  if (el.auditCriarPhotoMessage) el.auditCriarPhotoMessage.textContent = "";
   renderAuditCriarPickerGrid();
+  renderAuditCriarPhotoGrid();
   showAuditCriarStep("picker");
 }
+
+el.auditCriarSummarySaveBtn?.addEventListener("click", async () => {
+  if (!auditCriarCurrentAuditoria) return;
+  const resumoAuditoria = el.auditCriarResumo?.value.trim() || "";
+  const observacoesGerais = el.auditCriarObservacoesGerais?.value.trim() || "";
+  if (el.auditCriarSummarySaveBtn) el.auditCriarSummarySaveBtn.disabled = true;
+  if (el.auditCriarSummaryMessage) el.auditCriarSummaryMessage.textContent = "Salvando...";
+  try {
+    await updateDoc(doc(db, "auditorias", auditCriarCurrentAuditoria.id), { resumoAuditoria, observacoesGerais });
+    auditCriarCurrentAuditoria.resumoAuditoria = resumoAuditoria;
+    auditCriarCurrentAuditoria.observacoesGerais = observacoesGerais;
+    const idx = auditoriasData.findIndex((a) => a.id === auditCriarCurrentAuditoria.id);
+    if (idx !== -1) auditoriasData[idx] = { ...auditoriasData[idx], resumoAuditoria, observacoesGerais };
+    if (el.auditCriarSummaryMessage) el.auditCriarSummaryMessage.textContent = "Salvo.";
+  } catch (err) {
+    console.error("Erro ao salvar resumo/observações.", err);
+    if (el.auditCriarSummaryMessage) {
+      el.auditCriarSummaryMessage.textContent = `Não foi possível salvar: "${err?.message || err}".`;
+    }
+  } finally {
+    if (el.auditCriarSummarySaveBtn) el.auditCriarSummarySaveBtn.disabled = false;
+  }
+});
+
+async function uploadPhotosToStorage(files, pathPrefix) {
+  const uploaded = [];
+  for (const file of files) {
+    const safeName = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}_${file.name.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
+    const path = `${pathPrefix}/${safeName}`;
+    const fileRef = storageRef(storage, path);
+    await uploadBytes(fileRef, file);
+    const url = await getDownloadURL(fileRef);
+    uploaded.push({ url, path, name: file.name });
+  }
+  return uploaded;
+}
+
+async function deletePhotoFromStorage(photo) {
+  if (!photo?.path) return;
+  try {
+    await deleteObject(storageRef(storage, photo.path));
+  } catch (err) {
+    console.error("Erro ao excluir foto do Storage.", err);
+  }
+}
+
+function renderAuditCriarPhotoGrid() {
+  if (!el.auditCriarPhotoGrid || !auditCriarCurrentAuditoria) return;
+  const fotos = auditCriarCurrentAuditoria.fotos || [];
+  el.auditCriarPhotoGrid.innerHTML = "";
+  if (!fotos.length) {
+    el.auditCriarPhotoGrid.innerHTML = `<p class="audit-photo-empty">Nenhuma foto adicionada ainda.</p>`;
+    return;
+  }
+  fotos.forEach((foto, index) => {
+    const item = document.createElement("div");
+    item.className = "audit-photo-item";
+    item.innerHTML = `
+      <img src="${escapeHtml(foto.url)}" alt="Foto da auditoria" loading="lazy">
+      <button type="button" class="audit-photo-remove" title="Remover foto">&times;</button>
+    `;
+    item.querySelector(".audit-photo-remove")?.addEventListener("click", () => removeAuditPhoto(index));
+    el.auditCriarPhotoGrid.appendChild(item);
+  });
+}
+
+async function removeAuditPhoto(index) {
+  if (!auditCriarCurrentAuditoria) return;
+  const fotos = [...(auditCriarCurrentAuditoria.fotos || [])];
+  const [removed] = fotos.splice(index, 1);
+  if (!removed) return;
+  if (!confirm("Remover esta foto da auditoria?")) return;
+  try {
+    await updateDoc(doc(db, "auditorias", auditCriarCurrentAuditoria.id), { fotos });
+    await deletePhotoFromStorage(removed);
+    auditCriarCurrentAuditoria.fotos = fotos;
+    const idx = auditoriasData.findIndex((a) => a.id === auditCriarCurrentAuditoria.id);
+    if (idx !== -1) auditoriasData[idx] = { ...auditoriasData[idx], fotos };
+    renderAuditCriarPhotoGrid();
+  } catch (err) {
+    console.error("Erro ao remover foto.", err);
+    alert(`Não foi possível remover a foto: "${err?.message || err}".`);
+  }
+}
+
+el.auditCriarPhotoInput?.addEventListener("change", async () => {
+  if (!auditCriarCurrentAuditoria || !el.auditCriarPhotoInput.files?.length) return;
+  const files = Array.from(el.auditCriarPhotoInput.files);
+  if (el.auditCriarPhotoMessage) el.auditCriarPhotoMessage.textContent = "Enviando fotos...";
+  try {
+    const uploaded = await uploadPhotosToStorage(files, `auditorias/${auditCriarCurrentAuditoria.id}`);
+    const fotos = [...(auditCriarCurrentAuditoria.fotos || []), ...uploaded];
+    await updateDoc(doc(db, "auditorias", auditCriarCurrentAuditoria.id), { fotos });
+    auditCriarCurrentAuditoria.fotos = fotos;
+    const idx = auditoriasData.findIndex((a) => a.id === auditCriarCurrentAuditoria.id);
+    if (idx !== -1) auditoriasData[idx] = { ...auditoriasData[idx], fotos };
+    if (el.auditCriarPhotoMessage) el.auditCriarPhotoMessage.textContent = "";
+    renderAuditCriarPhotoGrid();
+  } catch (err) {
+    console.error("Erro ao enviar fotos.", err);
+    if (el.auditCriarPhotoMessage) {
+      el.auditCriarPhotoMessage.textContent = `Não foi possível enviar as fotos: "${err?.message || err}". Verifique se o Firebase Storage está habilitado e com as regras liberadas.`;
+    }
+  } finally {
+    el.auditCriarPhotoInput.value = "";
+  }
+});
+
+el.auditCriarPickerStatus?.addEventListener("change", async () => {
+  if (!auditCriarCurrentAuditoria) return;
+  const newStatus = el.auditCriarPickerStatus.value;
+  try {
+    await updateDoc(doc(db, "auditorias", auditCriarCurrentAuditoria.id), { status: newStatus });
+    auditCriarCurrentAuditoria.status = newStatus;
+    const idx = auditoriasData.findIndex((a) => a.id === auditCriarCurrentAuditoria.id);
+    if (idx !== -1) auditoriasData[idx] = { ...auditoriasData[idx], status: newStatus };
+  } catch (err) {
+    console.error("Erro ao atualizar status da auditoria.", err);
+    alert(`Não foi possível atualizar o status: "${err?.message || err}".`);
+  }
+});
 
 function renderAuditCriarPickerGrid() {
   if (!el.auditCriarPickerGrid || !auditCriarCurrentAuditoria) return;
@@ -2340,8 +2766,8 @@ async function handleAuditCriarFillSubmit(event) {
         riskAnalysis: "",
         recurrentNc: "No",
         needsInvestment: "No",
-        ncDate: auditoria.date || "",
-        year: (auditoria.date || "").slice(0, 4),
+        ncDate: auditoria.dateStart || "",
+        year: (auditoria.dateStart || "").slice(0, 4),
         ncDept: template.ncDept,
         ncSector: item.categoria,
         responsableSector: "",
@@ -2388,28 +2814,67 @@ el.auditCriarFillBackBtn?.addEventListener("click", () => {
   showAuditCriarStep("picker");
 });
 
+el.auditCriarDataInicio?.addEventListener("change", () => {
+  if (el.auditCriarDataFim && el.auditCriarDataInicio.value) {
+    el.auditCriarDataFim.min = el.auditCriarDataInicio.value;
+    if (el.auditCriarDataFim.value && el.auditCriarDataFim.value < el.auditCriarDataInicio.value) {
+      el.auditCriarDataFim.value = el.auditCriarDataInicio.value;
+    }
+  }
+});
+
 el.auditCriarForm?.addEventListener("submit", async (event) => {
   event.preventDefault();
+  const setFormMsg = (text) => {
+    if (el.auditCriarFormMessage) el.auditCriarFormMessage.textContent = text;
+  };
+
   const auditNumber = el.auditCriarNumero.value.trim();
   if (!auditNumber) {
-    if (el.auditCriarFormMessage) el.auditCriarFormMessage.textContent = "Informe o N° da auditoria.";
+    setFormMsg("Informe o N° da auditoria.");
+    return;
+  }
+
+  const dataInicio = el.auditCriarDataInicio?.value || "";
+  const dataFim = el.auditCriarDataFim?.value || "";
+  const todayStr = new Date().toISOString().slice(0, 10);
+
+  if (!dataInicio || !dataFim) {
+    setFormMsg("Informe a data inicial e a data final do período da auditoria.");
+    return;
+  }
+  if (dataInicio < todayStr || dataFim < todayStr) {
+    setFormMsg("Não é possível usar datas anteriores a hoje no período da auditoria.");
+    return;
+  }
+  if (dataFim < dataInicio) {
+    setFormMsg("A data final não pode ser anterior à data inicial.");
     return;
   }
 
   if (el.auditCriarSaveBtn) el.auditCriarSaveBtn.disabled = true;
-  if (el.auditCriarFormMessage) el.auditCriarFormMessage.textContent = "Criando auditoria...";
+  setFormMsg("Criando auditoria...");
 
   try {
     const payload = {
       auditNumber,
       base: el.auditCriarBase.value || "",
-      date: el.auditCriarData.value || "",
+      dateStart: dataInicio,
+      dateEnd: dataFim,
       auditType: el.auditCriarTipo.value || "",
       client: el.auditCriarCliente.value || "",
+      status: el.auditCriarStatus?.value || "Em Progresso",
       auditorResponsavel: el.auditCriarAuditor.value.trim(),
       auditadoResponsavel: el.auditCriarAuditado.value.trim(),
+      equipeAuditada: el.auditCriarEquipe?.value.trim() || "",
       observador1: el.auditCriarObs1.value.trim(),
       observador2: el.auditCriarObs2.value.trim(),
+      numColaboradores: el.auditCriarNumColaboradores?.value || "",
+      numAeronavesEo: el.auditCriarNumAeronavesEo?.value || "",
+      numAeronavesManut: el.auditCriarNumAeronavesManut?.value || "",
+      objetivo: el.auditCriarObjetivo?.value.trim() || "",
+      escopo: el.auditCriarEscopo?.value.trim() || "",
+      fotos: [],
       createdAt: new Date().toISOString(),
       createdBy: auth.currentUser?.email || ""
     };
@@ -2419,7 +2884,7 @@ el.auditCriarForm?.addEventListener("submit", async (event) => {
     openAuditCriarPicker(auditoria);
   } catch (err) {
     console.error("Erro ao criar auditoria.", err);
-    if (el.auditCriarFormMessage) el.auditCriarFormMessage.textContent = `Não foi possível criar a auditoria: "${err?.message || err}".`;
+    setFormMsg(`Não foi possível criar a auditoria: "${err?.message || err}".`);
   } finally {
     if (el.auditCriarSaveBtn) el.auditCriarSaveBtn.disabled = false;
   }

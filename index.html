@@ -12,6 +12,7 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/pizzip@3.2.0/dist/pizzip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/docxtemplater@3.70.0/build/docxtemplater.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/docxtemplater-image-module-free@1.1.1/build/imagemodule.js"></script>
 </head>
 
 <body>
@@ -135,7 +136,7 @@
             <path d="M12 5v14"></path>
             <path d="M5 12h14"></path>
           </svg>
-          Criar Auditoria
+          Auditoria
         </button>
         <button type="button" class="gh-nav-item" data-tab-target="auditoriaDashboard" onclick="showTab('auditoriaDashboard')">
           <svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -766,7 +767,7 @@
       <div class="page-heading">
         <div>
           <p class="eyebrow">Auditoria</p>
-          <h1>Criar Auditoria</h1>
+          <h1>Auditoria</h1>
           <p class="page-subtitle">Abra uma auditoria, preencha os checklists de cada setor e as não conformidades vão automaticamente para a Operação.</p>
         </div>
       </div>
@@ -791,12 +792,16 @@
               <input id="auditCriarNumero" class="input-custom" required>
             </label>
             <label class="edit-field">
-              <span>Base</span>
+              <span>Base / Localidade Auditada</span>
               <select id="auditCriarBase" class="input-custom"></select>
             </label>
             <label class="edit-field">
-              <span>Data</span>
-              <input id="auditCriarData" type="date" class="input-custom">
+              <span>Data Inicial *</span>
+              <input id="auditCriarDataInicio" type="date" class="input-custom" required>
+            </label>
+            <label class="edit-field">
+              <span>Data Final *</span>
+              <input id="auditCriarDataFim" type="date" class="input-custom" required>
             </label>
             <label class="edit-field">
               <span>Tipo de Auditoria</span>
@@ -807,12 +812,24 @@
               <select id="auditCriarCliente" class="input-custom"></select>
             </label>
             <label class="edit-field">
-              <span>Auditor Responsável</span>
+              <span>Status</span>
+              <select id="auditCriarStatus" class="input-custom">
+                <option value="Em Progresso">Em Progresso</option>
+                <option value="Concluída">Concluída</option>
+                <option value="Cancelada">Cancelada</option>
+              </select>
+            </label>
+            <label class="edit-field">
+              <span>Auditor(es) Responsável(is)</span>
               <input id="auditCriarAuditor" class="input-custom">
             </label>
             <label class="edit-field">
               <span>Auditado Responsável</span>
               <input id="auditCriarAuditado" class="input-custom">
+            </label>
+            <label class="edit-field">
+              <span>Equipe Auditada</span>
+              <input id="auditCriarEquipe" class="input-custom">
             </label>
             <label class="edit-field">
               <span>Observador 1</span>
@@ -821,6 +838,26 @@
             <label class="edit-field">
               <span>Observador 2</span>
               <input id="auditCriarObs2" class="input-custom">
+            </label>
+            <label class="edit-field">
+              <span>Número de Colaboradores</span>
+              <input id="auditCriarNumColaboradores" type="number" min="0" class="input-custom">
+            </label>
+            <label class="edit-field">
+              <span>N° de Aeronaves na EO</span>
+              <input id="auditCriarNumAeronavesEo" type="number" min="0" class="input-custom">
+            </label>
+            <label class="edit-field">
+              <span>Aeronaves em Processo de Manutenção</span>
+              <input id="auditCriarNumAeronavesManut" type="number" min="0" class="input-custom">
+            </label>
+            <label class="edit-field audit-field-wide">
+              <span>Objetivo</span>
+              <textarea id="auditCriarObjetivo" class="input-custom" rows="2"></textarea>
+            </label>
+            <label class="edit-field audit-field-wide">
+              <span>Escopo</span>
+              <textarea id="auditCriarEscopo" class="input-custom" rows="2"></textarea>
             </label>
           </div>
           <p id="auditCriarFormMessage" class="edit-message"></p>
@@ -839,8 +876,59 @@
             <h1>Escolha o checklist</h1>
             <p class="page-subtitle">Preencha um checklist por setor visitado nesta auditoria.</p>
           </div>
+          <div class="audit-criar-picker-actions">
+            <label class="edit-field audit-criar-status-field">
+              <span>Status da auditoria</span>
+              <select id="auditCriarPickerStatus" class="input-custom">
+                <option value="Em Progresso">Em Progresso</option>
+                <option value="Concluída">Concluída</option>
+                <option value="Cancelada">Cancelada</option>
+              </select>
+            </label>
+            <button type="button" id="auditCriarReportBtn" class="modal-action secondary audit-emit-btn">Gerar Relatório (FQ-073)</button>
+          </div>
         </div>
         <div id="auditCriarPickerGrid" class="audit-checklist-grid"></div>
+
+        <div class="audit-criar-photos-block audit-criar-summary-block">
+          <div class="page-heading">
+            <div>
+              <p class="eyebrow">Relatório de Auditoria (FQ-073)</p>
+              <h1 class="audit-criar-photos-title">Resumo e Observações</h1>
+              <p class="page-subtitle">Usados para preencher o FQ-073 gerado a partir desta auditoria.</p>
+            </div>
+          </div>
+          <div class="audit-nc-grid">
+            <label class="edit-field audit-field-wide">
+              <span>Resumo da Auditoria</span>
+              <textarea id="auditCriarResumo" class="input-custom" rows="3"></textarea>
+            </label>
+            <label class="edit-field audit-field-wide">
+              <span>Observações Gerais (uma por linha)</span>
+              <textarea id="auditCriarObservacoesGerais" class="input-custom" rows="3"></textarea>
+            </label>
+          </div>
+          <div class="edit-actions audit-criar-summary-actions">
+            <button type="button" id="auditCriarSummarySaveBtn" class="modal-action secondary">Salvar Resumo e Observações</button>
+          </div>
+          <p id="auditCriarSummaryMessage" class="edit-message"></p>
+        </div>
+
+        <div class="audit-criar-photos-block">
+          <div class="page-heading">
+            <div>
+              <p class="eyebrow">Evidências</p>
+              <h1 class="audit-criar-photos-title">Fotos da Auditoria</h1>
+              <p class="page-subtitle">Fotos gerais da auditoria (não vinculadas a uma NC específica). Elas entram no Relatório de Auditoria.</p>
+            </div>
+            <label class="modal-action secondary audit-photo-upload-btn">
+              Adicionar fotos
+              <input type="file" id="auditCriarPhotoInput" accept="image/*" multiple hidden>
+            </label>
+          </div>
+          <p id="auditCriarPhotoMessage" class="edit-message"></p>
+          <div id="auditCriarPhotoGrid" class="audit-photo-grid"></div>
+        </div>
       </div>
 
       <div id="auditCriarStepFill" hidden>
@@ -1154,6 +1242,18 @@
           <span>Observações</span>
           <textarea id="auditNcHighlight" class="input-custom" rows="2"></textarea>
         </label>
+      </div>
+
+      <div class="audit-criar-photos-block audit-nc-photos-block">
+        <div class="audit-nc-photos-head">
+          <span>Fotos da não conformidade</span>
+          <label class="modal-action secondary audit-photo-upload-btn" id="auditNcPhotoUploadLabel" hidden>
+            Adicionar fotos
+            <input type="file" id="auditNcPhotoInput" accept="image/*" multiple hidden>
+          </label>
+        </div>
+        <p id="auditNcPhotoMessage" class="edit-message"></p>
+        <div id="auditNcPhotoGrid" class="audit-photo-grid"></div>
       </div>
 
       <p id="auditNcMessage" class="edit-message"></p>
