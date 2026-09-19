@@ -195,19 +195,43 @@
       </div>
 
       <label class="theme-toggle" title="Alternar entre tema escuro e claro">
-        <input type="checkbox" id="themeToggleInput" aria-label="Alternar tema claro/escuro">
+        <input type="checkbox" id="themeToggleInput" aria-label="Alternar tema claro/escuro" onchange="window.__setHbrTheme && window.__setHbrTheme(this.checked ? 'light' : 'dark')">
         <span class="theme-toggle-track">
           <span class="theme-toggle-thumb">
-            <svg class="theme-icon theme-icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+            <svg class="theme-icon theme-icon-moon" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M20.354 15.354A9 9 0 0 1 8.646 3.646 9.003 9.003 0 1 0 20.354 15.354z"></path>
             </svg>
-            <svg class="theme-icon theme-icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <circle cx="12" cy="12" r="4"></circle>
-              <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"></path>
+            <svg class="theme-icon theme-icon-sun" viewBox="0 0 24 24" fill="currentColor">
+              <circle cx="12" cy="12" r="5"></circle>
+              <g stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                <line x1="12" y1="1.5" x2="12" y2="4"></line>
+                <line x1="12" y1="20" x2="12" y2="22.5"></line>
+                <line x1="1.5" y1="12" x2="4" y2="12"></line>
+                <line x1="20" y1="12" x2="22.5" y2="12"></line>
+              </g>
             </svg>
           </span>
         </span>
       </label>
+      <script>
+        (function () {
+          var THEME_KEY = "hbrTheme";
+          window.__setHbrTheme = function (theme) {
+            var resolved = theme === "light" ? "light" : "dark";
+            document.documentElement.setAttribute("data-theme", resolved);
+            var input = document.getElementById("themeToggleInput");
+            if (input) input.checked = resolved === "light";
+            try {
+              localStorage.setItem(THEME_KEY, resolved);
+            } catch (err) {}
+          };
+          var saved = null;
+          try {
+            saved = localStorage.getItem(THEME_KEY);
+          } catch (err) {}
+          window.__setHbrTheme(saved === "light" ? "light" : "dark");
+        })();
+      </script>
 
       <div class="sidebar-user-actions">
         <button type="button" id="adminAccessBtn" class="playstore-button admin-access-btn">

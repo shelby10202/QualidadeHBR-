@@ -806,15 +806,18 @@ button {
 
 .theme-icon {
   position: absolute;
-  width: 13px;
-  height: 13px;
+  top: 50%;
+  left: 50%;
+  width: 14px;
+  height: 14px;
+  margin: -7px 0 0 -7px;
   color: var(--accent-contrast);
   transition: opacity 0.2s var(--ease), transform 0.2s var(--ease);
 }
 
 .theme-icon-sun {
   opacity: 0;
-  transform: scale(0.6) rotate(-90deg);
+  transform: scale(0.5) rotate(-90deg);
 }
 
 .theme-icon-moon {
@@ -833,7 +836,7 @@ button {
 
 .theme-toggle input:checked ~ .theme-toggle-track .theme-icon-moon {
   opacity: 0;
-  transform: scale(0.6) rotate(90deg);
+  transform: scale(0.5) rotate(90deg);
 }
 
 .theme-toggle input:focus-visible ~ .theme-toggle-track {

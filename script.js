@@ -3505,6 +3505,11 @@ document.getElementById("logoutBtn")?.addEventListener("click", async () => {
     alert("Não foi possível sair da conta. Tente novamente.");
   }
 });
+
+// Nota: a alternância de tema claro/escuro (botão na barra lateral) roda num
+// script inline em index.html, independente deste módulo — assim ela funciona
+// mesmo que algo aqui demore ou falhe ao carregar. Ver window.__setHbrTheme.
+
 el.adminGateForm?.addEventListener("submit", handleAdminGateSubmit);
 el.adminGateCloseBtn?.addEventListener("click", closeAdminGate);
 el.adminGateCancelBtn?.addEventListener("click", closeAdminGate);
