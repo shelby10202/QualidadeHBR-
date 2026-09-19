@@ -22,31 +22,36 @@
 
 <div id="login-screen">
   <form class="hero-form" id="loginForm">
-    <img class="login-logo" src="assets/hbr-logo-login.png" alt="HBR">
-    <p id="heading">Acessar plataforma</p>
-
-    <div class="field">
-      <svg class="input-icon" viewBox="0 0 16 16">
-        <path d="M13.106 7.222"></path>
-      </svg>
-
-      <input id="loginEmail" class="input-field" type="email" placeholder="Email">
+    <div class="login-brand-panel">
+      <img class="login-logo" src="assets/hbr-logo-login.png" alt="HBR">
     </div>
 
-    <div class="field">
-      <svg class="input-icon" viewBox="0 0 16 16">
-        <path d="M8 1a2 2 0 0 1 2 2v4H6V3a2 2 0 0 1 2-2z"></path>
-      </svg>
+    <div class="login-fields-panel">
+      <p id="heading">Acessar plataforma</p>
 
-      <input id="loginSenha" class="input-field" type="password" placeholder="Senha">
+      <div class="field">
+        <svg class="input-icon" viewBox="0 0 16 16">
+          <path d="M13.106 7.222"></path>
+        </svg>
+
+        <input id="loginEmail" class="input-field" type="email" placeholder="Email">
+      </div>
+
+      <div class="field">
+        <svg class="input-icon" viewBox="0 0 16 16">
+          <path d="M8 1a2 2 0 0 1 2 2v4H6V3a2 2 0 0 1 2-2z"></path>
+        </svg>
+
+        <input id="loginSenha" class="input-field" type="password" placeholder="Senha">
+      </div>
+
+      <div class="btn">
+        <button type="submit" class="button1">Login</button>
+        <button type="button" class="button2" id="signupBtn">Criar</button>
+      </div>
+
+      <p id="loginMessage" class="login-message" aria-live="polite"></p>
     </div>
-
-    <div class="btn">
-      <button type="submit" class="button1">Login</button>
-      <button type="button" class="button2" id="signupBtn">Criar</button>
-    </div>
-
-    <p id="loginMessage" class="login-message" aria-live="polite"></p>
   </form>
 </div>
 <div id="loader-screen" style="display: none;">
