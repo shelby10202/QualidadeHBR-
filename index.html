@@ -194,31 +194,30 @@
         <strong id="userEmail">...</strong>
       </div>
 
-      <!-- Switch de tema — adaptado de um componente de Uiverse.io (by JkHuger) para a paleta HBR -->
-      <label for="themeToggleInput" class="theme" title="Alternar entre tema claro e escuro">
-        <span class="theme__toggle-wrap">
-          <input
-            id="themeToggleInput"
-            class="theme__toggle"
-            type="checkbox"
-            role="switch"
-            name="theme"
-            aria-label="Alternar tema claro/escuro"
-            onchange="window.__setHbrTheme && window.__setHbrTheme(this.checked ? 'dark' : 'light', {sweep: true})"
-          >
-          <span class="theme__fill"></span>
-          <span class="theme__icon">
-            <span class="theme__icon-part"></span>
-            <span class="theme__icon-part"></span>
-            <span class="theme__icon-part"></span>
-            <span class="theme__icon-part"></span>
-            <span class="theme__icon-part"></span>
-            <span class="theme__icon-part"></span>
-            <span class="theme__icon-part"></span>
-            <span class="theme__icon-part"></span>
-            <span class="theme__icon-part"></span>
+      <!-- Switch de tema — adaptado de um componente de Uiverse.io (by uiverse-astronaut, "honest-dolphin-65") para a paleta HBR -->
+      <label class="bloom-switch" for="themeToggleInput" title="Alternar entre tema claro e escuro">
+        <input
+          id="themeToggleInput"
+          type="checkbox"
+          role="switch"
+          name="theme"
+          aria-label="Alternar tema claro/escuro"
+          onchange="window.__setHbrTheme && window.__setHbrTheme(this.checked ? 'dark' : 'light', {sweep: true})"
+        >
+        <span class="bloom-switch__track">
+          <span class="bloom-switch__star bloom-switch__star--1"></span>
+          <span class="bloom-switch__star bloom-switch__star--2"></span>
+          <span class="bloom-switch__star bloom-switch__star--3"></span>
+          <span class="bloom-switch__thumb">
+            <svg class="bloom-switch__sun" viewBox="0 0 256 256" aria-hidden="true">
+              <path fill="currentColor" d="M120,40V16a8,8,0,0,1,16,0V40a8,8,0,0,1-16,0Zm72,88a64,64,0,1,1-64-64A64.07,64.07,0,0,1,192,128Zm-16,0a48,48,0,1,0-48,48A48.05,48.05,0,0,0,176,128ZM58.34,69.66A8,8,0,0,0,69.66,58.34l-16-16A8,8,0,0,0,42.34,53.66Zm0,116.68-16,16a8,8,0,0,0,11.32,11.32l16-16a8,8,0,0,0-11.32-11.32ZM192,72a8,8,0,0,0,5.66-2.34l16-16a8,8,0,0,0-11.32-11.32l-16,16A8,8,0,0,0,192,72Zm5.66,114.34a8,8,0,0,0-11.32,11.32l16,16a8,8,0,0,0,11.32-11.32ZM48,128a8,8,0,0,0-8-8H16a8,8,0,0,0,0,16H40A8,8,0,0,0,48,128Zm80,80a8,8,0,0,0-8,8v24a8,8,0,0,0,16,0V216A8,8,0,0,0,128,208Zm112-88H216a8,8,0,0,0,0,16h24a8,8,0,0,0,0-16Z"></path>
+            </svg>
+            <svg class="bloom-switch__moon" viewBox="0 0 256 256" aria-hidden="true">
+              <path fill="currentColor" d="M233.54,142.23a8,8,0,0,0-8-2,88.08,88.08,0,0,1-109.8-109.8,8,8,0,0,0-10-10,104.84,104.84,0,0,0-52.91,37A104,104,0,0,0,136,224a103.09,103.09,0,0,0,62.52-20.88,104.84,104.84,0,0,0,37-52.91A8,8,0,0,0,233.54,142.23Z"></path>
+            </svg>
           </span>
         </span>
+        <span class="hbr-theme-sweep"></span>
       </label>
       <script>
         (function () {
@@ -229,7 +228,7 @@
             var input = document.getElementById("themeToggleInput");
             if (input) input.checked = resolved === "dark";
             if (opts && opts.sweep) {
-              var fill = document.querySelector(".theme__fill");
+              var fill = document.querySelector(".hbr-theme-sweep");
               if (fill) {
                 fill.classList.remove("is-sweeping");
                 // força reflow para poder reiniciar a animação em cliques seguidos
@@ -721,9 +720,53 @@
             <p class="page-subtitle">Mapa estrutural, conexões de dados e lembretes.</p>
           </div>
 
-          <div class="total-pill">
-            <span id="adminAreaCount">5</span>
-            <small>módulos</small>
+          <div class="admin-heading-corner">
+            <!-- Mascote — adaptado de um componente de Uiverse.io (by BlackisPlay, "sweet-frog-67") para a paleta HBR -->
+            <div class="admin-ghost-mascot" aria-hidden="true" title="HBR">
+              <div id="hbrGhost">
+                <div id="hbrGhostBody">
+                  <div id="hbrGhostPupil"></div>
+                  <div id="hbrGhostPupil1"></div>
+                  <div id="hbrGhostEye"></div>
+                  <div id="hbrGhostEye1"></div>
+                  <div id="hbrGhostTop0"></div>
+                  <div id="hbrGhostTop1"></div>
+                  <div id="hbrGhostTop2"></div>
+                  <div id="hbrGhostTop3"></div>
+                  <div id="hbrGhostTop4"></div>
+                  <div id="hbrGhostSt0"></div>
+                  <div id="hbrGhostSt1"></div>
+                  <div id="hbrGhostSt2"></div>
+                  <div id="hbrGhostSt3"></div>
+                  <div id="hbrGhostSt4"></div>
+                  <div id="hbrGhostSt5"></div>
+                  <div id="hbrGhostAn1"></div>
+                  <div id="hbrGhostAn2"></div>
+                  <div id="hbrGhostAn3"></div>
+                  <div id="hbrGhostAn4"></div>
+                  <div id="hbrGhostAn5"></div>
+                  <div id="hbrGhostAn6"></div>
+                  <div id="hbrGhostAn7"></div>
+                  <div id="hbrGhostAn8"></div>
+                  <div id="hbrGhostAn9"></div>
+                  <div id="hbrGhostAn10"></div>
+                  <div id="hbrGhostAn11"></div>
+                  <div id="hbrGhostAn12"></div>
+                  <div id="hbrGhostAn13"></div>
+                  <div id="hbrGhostAn14"></div>
+                  <div id="hbrGhostAn15"></div>
+                  <div id="hbrGhostAn16"></div>
+                  <div id="hbrGhostAn17"></div>
+                  <div id="hbrGhostAn18"></div>
+                </div>
+                <div id="hbrGhostShadow"></div>
+              </div>
+            </div>
+
+            <div class="total-pill">
+              <span id="adminAreaCount">5</span>
+              <small>módulos</small>
+            </div>
           </div>
         </div>
 
