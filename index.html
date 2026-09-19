@@ -194,33 +194,49 @@
         <strong id="userEmail">...</strong>
       </div>
 
-      <label class="theme-toggle" title="Alternar entre tema escuro e claro">
-        <input type="checkbox" id="themeToggleInput" aria-label="Alternar tema claro/escuro" onchange="window.__setHbrTheme && window.__setHbrTheme(this.checked ? 'light' : 'dark')">
-        <span class="theme-toggle-track">
-          <span class="theme-toggle-thumb">
-            <svg class="theme-icon theme-icon-moon" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M20.354 15.354A9 9 0 0 1 8.646 3.646 9.003 9.003 0 1 0 20.354 15.354z"></path>
-            </svg>
-            <svg class="theme-icon theme-icon-sun" viewBox="0 0 24 24" fill="currentColor">
-              <circle cx="12" cy="12" r="5"></circle>
-              <g stroke="currentColor" stroke-width="2" stroke-linecap="round">
-                <line x1="12" y1="1.5" x2="12" y2="4"></line>
-                <line x1="12" y1="20" x2="12" y2="22.5"></line>
-                <line x1="1.5" y1="12" x2="4" y2="12"></line>
-                <line x1="20" y1="12" x2="22.5" y2="12"></line>
-              </g>
-            </svg>
+      <!-- Switch de tema — adaptado de um componente de Uiverse.io (by JkHuger) para a paleta HBR -->
+      <label for="themeToggleInput" class="theme" title="Alternar entre tema claro e escuro">
+        <span class="theme__toggle-wrap">
+          <input
+            id="themeToggleInput"
+            class="theme__toggle"
+            type="checkbox"
+            role="switch"
+            name="theme"
+            aria-label="Alternar tema claro/escuro"
+            onchange="window.__setHbrTheme && window.__setHbrTheme(this.checked ? 'dark' : 'light', {sweep: true})"
+          >
+          <span class="theme__fill"></span>
+          <span class="theme__icon">
+            <span class="theme__icon-part"></span>
+            <span class="theme__icon-part"></span>
+            <span class="theme__icon-part"></span>
+            <span class="theme__icon-part"></span>
+            <span class="theme__icon-part"></span>
+            <span class="theme__icon-part"></span>
+            <span class="theme__icon-part"></span>
+            <span class="theme__icon-part"></span>
+            <span class="theme__icon-part"></span>
           </span>
         </span>
       </label>
       <script>
         (function () {
           var THEME_KEY = "hbrTheme";
-          window.__setHbrTheme = function (theme) {
+          window.__setHbrTheme = function (theme, opts) {
             var resolved = theme === "light" ? "light" : "dark";
             document.documentElement.setAttribute("data-theme", resolved);
             var input = document.getElementById("themeToggleInput");
-            if (input) input.checked = resolved === "light";
+            if (input) input.checked = resolved === "dark";
+            if (opts && opts.sweep) {
+              var fill = document.querySelector(".theme__fill");
+              if (fill) {
+                fill.classList.remove("is-sweeping");
+                // força reflow para poder reiniciar a animação em cliques seguidos
+                void fill.offsetWidth;
+                fill.classList.add("is-sweeping");
+              }
+            }
             try {
               localStorage.setItem(THEME_KEY, resolved);
             } catch (err) {}
