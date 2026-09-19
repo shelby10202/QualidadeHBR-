@@ -108,9 +108,9 @@ button {
 }
 
 
-/* ===== Login (hero) — paleta própria isolada em #login-screen, não afeta o tema do resto do site ===== */
+/* ===== Login — cartão centralizado em fundo preto, paleta própria isolada em #login-screen ===== */
 #login-screen {
-  --login-bg: #050505;
+  --login-bg: #000000;
   --login-accent: #FEA30B;
   --login-accent-2: #E0910A;
   --login-muted: #a1a1aa;
@@ -131,146 +131,16 @@ button {
 
 #login-screen {
   z-index: 9999;
-  flex-direction: column;
-  align-items: flex-start;
-  justify-content: center;
-  gap: clamp(14px, 2.2vw, 26px);
-  overflow: hidden;
-  padding: 76px clamp(20px, 6vw, 56px) 68px;
   background: var(--login-bg);
 }
 
-.hero3d-embed,
-.hero-noise,
-.hero-vignette {
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-  pointer-events: none;
-}
-
-.hero3d-embed {
-  width: 100%;
-  height: 100%;
-  pointer-events: none;
-}
-
-.hero3d-img {
-  width: 100%;
-  height: 100%;
+.login-logo {
   display: block;
+  width: 76px;
+  height: 76px;
+  margin: 0 auto 4px;
+  border-radius: 16px;
   object-fit: cover;
-  object-position: center 42%;
-}
-
-.hero-noise {
-  z-index: 1;
-  opacity: 0.05;
-  mix-blend-mode: overlay;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-  background-size: 160px 160px;
-}
-
-.hero-vignette {
-  z-index: 1;
-  background: radial-gradient(circle at 28% 42%, transparent 0%, rgba(0, 0, 0, 0.62) 76%);
-}
-
-.hero-topline {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  z-index: 2;
-  display: flex;
-  justify-content: flex-end;
-  align-items: center;
-  padding: 18px clamp(20px, 5vw, 56px);
-}
-
-.hero-tag {
-  color: var(--login-muted);
-  font-size: 12px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.14em;
-}
-
-.hero-content {
-  position: relative;
-  z-index: 2;
-  max-width: 560px;
-}
-
-.hero-eyebrow {
-  margin: 0 0 8px;
-  color: var(--login-accent);
-  font-size: 12px;
-  font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: 0.16em;
-}
-
-.hero-title {
-  margin: 0;
-  display: flex;
-  flex-direction: column;
-  font-family: "Space Grotesk", "Inter", sans-serif;
-  font-weight: 700;
-  font-size: clamp(28px, 4.4vw, 52px);
-  line-height: 1;
-  letter-spacing: -0.02em;
-  color: #fff;
-}
-
-.hero-title .accent {
-  color: var(--login-accent);
-}
-
-.hero-sub {
-  max-width: 44ch;
-  margin: 12px 0 0;
-  color: var(--login-soft);
-  font-size: clamp(13px, 0.6vw + 11px, 15px);
-  line-height: 1.5;
-}
-
-.hero-marquee {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 2;
-  overflow: hidden;
-  border-top: 1px solid var(--login-line);
-  padding: 10px 0;
-  background: rgba(5, 5, 5, 0.65);
-  backdrop-filter: blur(4px);
-}
-
-.hero-marquee-track {
-  display: flex;
-  width: max-content;
-  animation: heroMarquee 24s linear infinite;
-}
-
-.hero-marquee-track span {
-  white-space: nowrap;
-  font-family: "Space Grotesk", "Inter", sans-serif;
-  font-weight: 600;
-  font-size: 13px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--login-muted);
-}
-
-@keyframes heroMarquee {
-  from {
-    transform: translateX(0);
-  }
-  to {
-    transform: translateX(-50%);
-  }
 }
 
 .loader {
