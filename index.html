@@ -68,7 +68,16 @@
 </div>
 
 <div class="app-shell">
+  <!-- Botão de recolher o menu — adaptado de um componente de Uiverse.io
+       (by vinodjangid07, "soft-octopus-29") para a paleta HBR. O checkbox e o label
+       precisam ser irmãos adjacentes (o CSS usa o seletor "+"), então o script de
+       detecção de celular foi movido para depois do label. -->
   <input type="checkbox" id="checkbox" class="sidebar-toggle-check" aria-label="Abrir ou fechar barra lateral">
+  <label for="checkbox" class="toggle sidebar-hamburger" title="Abrir ou fechar menu">
+    <div class="bar bar--top"></div>
+    <div class="bar bar--middle"></div>
+    <div class="bar bar--bottom"></div>
+  </label>
   <script>
     (function () {
       try {
@@ -79,11 +88,6 @@
       } catch (e) {}
     })();
   </script>
-  <label for="checkbox" class="toggle sidebar-hamburger" title="Abrir ou fechar menu">
-    <div class="bar bar--top"></div>
-    <div class="bar bar--middle"></div>
-    <div class="bar bar--bottom"></div>
-  </label>
 
   <aside class="sidebar">
     <button type="button" class="sidebar-brand" onclick="showTab('tabela')" title="Voltar para o início (Quarentena)">
