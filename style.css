@@ -134,9 +134,9 @@ button {
   flex-direction: column;
   align-items: flex-start;
   justify-content: center;
-  gap: clamp(20px, 3.5vw, 40px);
+  gap: clamp(14px, 2.2vw, 26px);
   overflow: hidden;
-  padding: 104px clamp(20px, 6vw, 64px) 96px;
+  padding: 76px clamp(20px, 6vw, 56px) 68px;
   background: var(--login-bg);
 }
 
@@ -152,40 +152,15 @@ button {
 .hero3d-embed {
   width: 100%;
   height: 100%;
-  pointer-events: auto;
+  pointer-events: none;
 }
 
-.hero3d-iframe {
+.hero3d-img {
   width: 100%;
   height: 100%;
-  border: 0;
   display: block;
-}
-
-.hero3d-credit {
-  position: absolute;
-  right: 14px;
-  bottom: 68px;
-  z-index: 1;
-  max-width: 260px;
-  margin: 0;
-  padding: 6px 10px;
-  border-radius: 999px;
-  background: rgba(5, 5, 5, 0.55);
-  backdrop-filter: blur(6px);
-  color: var(--login-muted);
-  font-size: 11px;
-  line-height: 1.4;
-  text-align: right;
-}
-
-.hero3d-credit a {
-  color: #d9d9d9;
-  font-weight: 700;
-}
-
-.hero3d-credit a:hover {
-  color: var(--login-accent);
+  object-fit: cover;
+  object-position: center 62%;
 }
 
 .hero-noise {
@@ -210,7 +185,7 @@ button {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 26px clamp(20px, 5vw, 56px);
+  padding: 18px clamp(20px, 5vw, 56px);
 }
 
 .hero-brand {
@@ -237,13 +212,13 @@ button {
 .hero-content {
   position: relative;
   z-index: 2;
-  max-width: 640px;
+  max-width: 560px;
 }
 
 .hero-eyebrow {
-  margin: 0 0 10px;
+  margin: 0 0 8px;
   color: var(--login-accent);
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.16em;
@@ -255,8 +230,8 @@ button {
   flex-direction: column;
   font-family: "Space Grotesk", "Inter", sans-serif;
   font-weight: 700;
-  font-size: clamp(38px, 6.4vw, 84px);
-  line-height: 0.98;
+  font-size: clamp(28px, 4.4vw, 52px);
+  line-height: 1;
   letter-spacing: -0.02em;
   color: #fff;
 }
@@ -266,10 +241,10 @@ button {
 }
 
 .hero-sub {
-  max-width: 46ch;
-  margin: 18px 0 0;
+  max-width: 44ch;
+  margin: 12px 0 0;
   color: var(--login-soft);
-  font-size: clamp(14px, 1vw + 12px, 17px);
+  font-size: clamp(13px, 0.6vw + 11px, 15px);
   line-height: 1.5;
 }
 
@@ -281,7 +256,7 @@ button {
   z-index: 2;
   overflow: hidden;
   border-top: 1px solid var(--login-line);
-  padding: 14px 0;
+  padding: 10px 0;
   background: rgba(5, 5, 5, 0.65);
   backdrop-filter: blur(4px);
 }
@@ -348,24 +323,24 @@ button {
 #login-screen .hero-form {
   position: relative;
   z-index: 2;
-  width: min(380px, calc(100% - 8px));
+  width: min(340px, calc(100% - 8px));
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  padding: clamp(1.4rem, 1vw + 1.2rem, 2rem);
+  gap: 10px;
+  padding: clamp(1.1rem, 0.8vw + 0.95rem, 1.5rem);
   border: 1px solid var(--login-line);
-  border-radius: 18px;
+  border-radius: 16px;
   background: rgba(19, 19, 19, 0.88);
   backdrop-filter: blur(14px);
   box-shadow: var(--shadow), 0 0 0 1px rgba(254, 163, 11, 0.06);
 }
 
 #login-screen #heading {
-  margin: 0 0 0.35rem;
+  margin: 0 0 0.3rem;
   color: #fff;
   text-align: center;
   font-weight: 800;
-  font-size: clamp(20px, 0.6vw + 18px, 24px);
+  font-size: clamp(17px, 0.5vw + 15px, 19px);
   letter-spacing: -0.01em;
 }
 
@@ -373,9 +348,9 @@ button {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 12px;
+  padding: 10px;
   border: 1px solid transparent;
-  border-radius: 14px;
+  border-radius: 12px;
   background: #101010;
   box-shadow: inset 2px 5px 10px rgb(5 5 5);
   transition: border-color 0.2s var(--ease);
@@ -414,8 +389,8 @@ button {
 #login-screen .hero-form .button2 {
   flex: 1;
   border: 1px solid transparent;
-  border-radius: 14px;
-  padding: 11px 12px;
+  border-radius: 12px;
+  padding: 9px 12px;
   font-weight: 800;
   letter-spacing: 0.01em;
 }
