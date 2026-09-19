@@ -3553,6 +3553,23 @@ renderAdminShell();
 initPublicationNetwork();
 initAdMonitor();
 
+// ===================== Painel Admin: navegação estilo "GitHub Settings" =====================
+// Um painel por vez à direita, escolhido pela navegação à esquerda (em vez dos módulos
+// todos empilhados de uma vez). Os botões já existem no HTML, então os listeners são
+// ligados uma única vez aqui.
+function showAdminPanelSection(key) {
+  document.querySelectorAll(".admin-panel[data-admin-panel]").forEach((panel) => {
+    panel.classList.toggle("active", panel.dataset.adminPanel === key);
+  });
+  document.querySelectorAll("[data-admin-panel-target]").forEach((btn) => {
+    btn.classList.toggle("is-selected", btn.dataset.adminPanelTarget === key);
+  });
+}
+
+document.querySelectorAll("[data-admin-panel-target]").forEach((btn) => {
+  btn.addEventListener("click", () => showAdminPanelSection(btn.dataset.adminPanelTarget));
+});
+
 function requestAdminAccess() {
   if (adminUnlocked) {
     window.showTab("admin");

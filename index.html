@@ -649,8 +649,33 @@
           </div>
         </div>
 
-        <div class="admin-grid">
-          <article class="admin-panel admin-tree-panel">
+        <div class="admin-settings">
+          <nav class="admin-settings-nav" aria-label="Seções do painel administrativo">
+            <div class="admin-settings-nav-group">
+              <p class="admin-settings-nav-label">Geral</p>
+              <button type="button" class="admin-settings-nav-item is-selected" data-admin-panel-target="estrutura">Estrutura do site</button>
+              <button type="button" class="admin-settings-nav-item" data-admin-panel-target="modulos">Módulos</button>
+            </div>
+            <div class="admin-settings-nav-group">
+              <p class="admin-settings-nav-label">Acesso</p>
+              <button type="button" class="admin-settings-nav-item" data-admin-panel-target="aprovacoes">Aprovação de usuários</button>
+              <button type="button" class="admin-settings-nav-item" data-admin-panel-target="usuarios">Usuários e cargos</button>
+            </div>
+            <div class="admin-settings-nav-group">
+              <p class="admin-settings-nav-label">Publicações e ADs</p>
+              <button type="button" class="admin-settings-nav-item" data-admin-panel-target="publicacoes">Rede técnica</button>
+              <button type="button" class="admin-settings-nav-item" data-admin-panel-target="escopo">Escopo fixo de AD</button>
+              <button type="button" class="admin-settings-nav-item" data-admin-panel-target="importar">Entrada de dados (Excel)</button>
+            </div>
+            <div class="admin-settings-nav-group">
+              <p class="admin-settings-nav-label">Produtividade</p>
+              <button type="button" class="admin-settings-nav-item" data-admin-panel-target="lembretes">Lembretes</button>
+              <button type="button" class="admin-settings-nav-item" data-admin-panel-target="historico">Histórico</button>
+            </div>
+          </nav>
+
+          <div class="admin-settings-content">
+          <article class="admin-panel admin-tree-panel active" data-admin-panel="estrutura">
             <div class="admin-panel-head">
               <span>Estrutura</span>
               <strong>Ramificações do site</strong>
@@ -658,7 +683,7 @@
             <div id="adminSiteTree" class="site-map-tree"></div>
           </article>
 
-          <article class="admin-panel ad-admin-scope-panel">
+          <article class="admin-panel ad-admin-scope-panel" data-admin-panel="escopo">
             <div class="admin-panel-head">
               <span>Escopo fixo</span>
               <strong>EO HBR Aviação - Osasco</strong>
@@ -666,7 +691,7 @@
             <div id="adScopeSummary" class="ad-scope-summary"></div>
           </article>
 
-          <article class="admin-panel publication-admin-panel">
+          <article class="admin-panel publication-admin-panel" data-admin-panel="publicacoes">
             <div class="admin-panel-head">
               <span>Publicações</span>
               <strong>Rede técnica</strong>
@@ -680,7 +705,7 @@
             </div>
           </article>
 
-          <article class="admin-panel document-import-panel">
+          <article class="admin-panel document-import-panel" data-admin-panel="importar">
             <div class="admin-panel-head">
               <span>Entrada de dados</span>
               <strong>Excel para rede de documentos</strong>
@@ -735,7 +760,7 @@
             <p id="documentImportMessage" class="edit-message"></p>
           </article>
 
-          <article class="admin-panel admin-approvals-panel">
+          <article class="admin-panel admin-approvals-panel" data-admin-panel="aprovacoes">
             <div class="admin-panel-head">
               <span>Aprovação de usuários</span>
               <strong id="adminApprovalsCount">0 pendentes</strong>
@@ -743,7 +768,7 @@
             <div id="adminApprovalsList" class="admin-approvals-list"></div>
           </article>
 
-          <article class="admin-panel admin-users-panel">
+          <article class="admin-panel admin-users-panel" data-admin-panel="usuarios">
             <div class="admin-panel-head">
               <span>Usuários</span>
               <strong>Última vez online</strong>
@@ -751,7 +776,7 @@
             <div id="adminUsersList" class="admin-users-list"></div>
           </article>
 
-          <article class="admin-panel admin-wide-panel">
+          <article class="admin-panel admin-wide-panel" data-admin-panel="modulos">
             <div class="admin-panel-head">
               <span>Módulos</span>
               <strong>Áreas fixas do site</strong>
@@ -759,7 +784,7 @@
             <div id="adminAreasList" class="admin-areas-list"></div>
           </article>
 
-          <article class="admin-panel">
+          <article class="admin-panel" data-admin-panel="lembretes">
             <div class="admin-panel-head">
               <span>Lembretes</span>
               <strong>Checklist administrativo</strong>
@@ -775,13 +800,14 @@
             <div id="checklist" aria-label="Lembretes administrativos"></div>
           </article>
 
-          <article class="admin-panel admin-history-panel">
+          <article class="admin-panel admin-history-panel" data-admin-panel="historico">
             <div class="admin-panel-head">
               <span>Histórico</span>
               <strong>Alterações do Admin</strong>
             </div>
             <div id="adminHistoryList" class="admin-history-list"></div>
           </article>
+          </div>
         </div>
       </div>
     </section>
