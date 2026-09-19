@@ -183,22 +183,9 @@ button {
   right: 0;
   z-index: 2;
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-end;
   align-items: center;
   padding: 18px clamp(20px, 5vw, 56px);
-}
-
-.hero-brand {
-  font-family: "Space Grotesk", "Inter", sans-serif;
-  font-weight: 700;
-  font-size: 18px;
-  color: #fff;
-  letter-spacing: 0.02em;
-}
-
-.hero-brand em {
-  color: var(--login-accent);
-  font-style: normal;
 }
 
 .hero-tag {
