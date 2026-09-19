@@ -399,6 +399,10 @@ button {
   overflow: auto;
 }
 
+.gh-nav-group[hidden] {
+  display: none;
+}
+
 .gh-nav-group {
   display: flex;
   flex-direction: column;
@@ -413,6 +417,10 @@ button {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.04em;
+}
+
+.gh-nav-item[hidden] {
+  display: none;
 }
 
 .gh-nav-item {
@@ -3120,6 +3128,17 @@ button {
   font-weight: 700;
 }
 
+.admin-user-cargos-error {
+  flex-basis: 100%;
+  color: var(--danger);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.admin-user-cargos-error[hidden] {
+  display: none;
+}
+
 /* Checkbox animado (estilo uiverse.io) usado na atribuição de cargos */
 .uv-checkbox {
   position: relative;
@@ -5719,6 +5738,10 @@ button {
 }
 
 /* ===================== Aviso de sem cargo atribuído ===================== */
+.no-cargo-notice[hidden] {
+  display: none;
+}
+
 .no-cargo-notice {
   min-height: 60vh;
   display: flex;

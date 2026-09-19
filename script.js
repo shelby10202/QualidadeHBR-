@@ -6607,10 +6607,24 @@ function renderAdminUsers() {
       input.id = optionId;
       input.checked = currentCargos.includes(cargo);
       input.addEventListener("change", () => {
+        const wasChecked = !input.checked;
         const next = new Set(currentCargos);
         if (input.checked) next.add(cargo);
         else next.delete(cargo);
-        updateUserCargos(user.id, [...next]);
+        updateUserCargos(user.id, [...next], {
+          onError: (message) => {
+            // Reverte a marcação na tela, já que a gravação no Firestore falhou:
+            // sem isso a caixinha ficaria marcada mesmo sem ter sido salva de verdade.
+            input.checked = wasChecked;
+            if (cargosError) {
+              cargosError.hidden = false;
+              cargosError.textContent = `Não salvou: ${message}`;
+            }
+          },
+          onSuccess: () => {
+            if (cargosError) cargosError.hidden = true;
+          }
+        });
       });
 
       const box = document.createElement("span");
@@ -6626,12 +6640,17 @@ function renderAdminUsers() {
       cargosBlock.appendChild(wrap);
     });
 
+    const cargosError = document.createElement("span");
+    cargosError.className = "admin-user-cargos-error";
+    cargosError.hidden = true;
+    cargosBlock.appendChild(cargosError);
+
     row.appendChild(cargosBlock);
     el.adminUsersList.appendChild(row);
   });
 }
 
-async function updateUserCargos(uid, cargos) {
+async function updateUserCargos(uid, cargos, { onError, onSuccess } = {}) {
   try {
     await updateDoc(doc(db, "usuarios", uid), { cargos });
     const idx = adminUsers.findIndex((item) => item.id === uid);
@@ -6640,10 +6659,12 @@ async function updateUserCargos(uid, cargos) {
       currentUserCargos = cargos;
       applyCargoVisibility();
     }
+    if (onSuccess) onSuccess();
   } catch (err) {
     console.error("Não foi possível atualizar os cargos deste usuário.", err);
-    alert(`Não foi possível salvar os cargos: "${err?.message || err}". Verifique as regras do Firestore.`);
-    renderAdminUsers();
+    const message = err?.message || String(err);
+    if (onError) onError(message);
+    alert(`Não foi possível salvar os cargos: "${message}". Provavelmente as Regras de Segurança do Firestore ainda não foram atualizadas — veja o arquivo firestore.rules.`);
   }
 }
 
