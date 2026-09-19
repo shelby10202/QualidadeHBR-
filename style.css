@@ -151,11 +151,24 @@ button {
 }
 
 .login-logo {
-  display: block;
-  width: 168px;
-  height: 168px;
-  border-radius: 28px;
-  object-fit: cover;
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  margin: 0;
+  font-family: "Space Grotesk", "Inter", sans-serif;
+  font-weight: 700;
+  font-size: 64px;
+  line-height: 1;
+  letter-spacing: -0.01em;
+  user-select: none;
+}
+
+.login-logo-h {
+  color: #888c93;
+}
+
+.login-logo-br {
+  color: var(--login-accent);
 }
 
 .login-divider {
@@ -179,8 +192,7 @@ button {
   }
 
   .login-logo {
-    width: 120px;
-    height: 120px;
+    font-size: 44px;
   }
 }
 
