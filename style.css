@@ -57,6 +57,16 @@
   --chip-orange: #9a3412;
 }
 
+/* Transição suave ao trocar de tema — troca de fundo/texto/borda vira um fade
+   limpo em vez de um "salto" seco de cor (e substitui o efeito de varredura antigo,
+   que ficava bruto). Só as propriedades de cor: não mexe com transform/width/opacity
+   usados pelas animações de cada componente. */
+*,
+*::before,
+*::after {
+  transition: background-color 0.4s var(--ease), border-color 0.4s var(--ease), color 0.4s var(--ease), box-shadow 0.4s var(--ease), fill 0.4s var(--ease), stroke 0.4s var(--ease);
+}
+
 * {
   box-sizing: border-box;
 }
@@ -830,7 +840,11 @@ button {
 
 .bloom-switch__sun,
 .bloom-switch__moon {
+  /* Centralizado com inset+margin:auto (não com place-items do pai), que é o método
+     confiável para centralizar um filho position:absolute de tamanho fixo. */
   position: absolute;
+  inset: 0;
+  margin: auto;
   width: 1rem;
   height: 1rem;
   transition: opacity 220ms ease, transform 320ms ease;
@@ -906,124 +920,91 @@ button {
   outline-offset: 3px;
 }
 
-/* Efeito de "varredura" transitório ao alternar — não fica preso na tela (evita cobrir o site inteiro) */
-.hbr-theme-sweep {
-  background-color: var(--bg);
-  display: block;
-  mix-blend-mode: difference;
-  position: fixed;
-  inset: 0;
-  height: 100%;
-  pointer-events: none;
-  z-index: 9997;
-  opacity: 0;
-  transform: translateX(-100%);
-}
-
-.hbr-theme-sweep.is-sweeping {
-  animation: themeFillSweep 0.5s ease-in-out;
-}
-
-@keyframes themeFillSweep {
-  0% {
-    opacity: 1;
-    transform: translateX(-100%);
-  }
-  50% {
-    opacity: 1;
-    transform: translateX(0);
-  }
-  100% {
-    opacity: 0;
-    transform: translateX(100%);
-  }
-}
-
 .sidebar-user-actions {
   width: 100%;
   display: flex;
-  gap: 8px;
+  gap: 12px;
+  justify-content: center;
 }
 
-.sidebar-user-actions .playstore-button {
-  width: auto;
-  flex: 1;
-  min-width: 0;
-}
-
-.logout-btn:hover {
-  border-color: var(--danger);
-  background-color: rgba(248, 81, 73, 0.12);
-}
-
-.logout-btn:hover .text-1 {
-  color: var(--danger);
-}
-
-.playstore-button {
+/* ===== Botões Admin/Logout — adaptados de um componente de Uiverse.io
+   (by kennyotsu-monochromia, "funny-kangaroo-70"), reskinados na paleta HBR ===== */
+.hbr-icon-btn {
+  --btn-bg-hover: var(--accent);
+  --btn-fg-hover: var(--accent-contrast);
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  flex: 0 0 auto;
+  width: 42px;
+  height: 42px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0;
+  cursor: pointer;
   position: relative;
   overflow: hidden;
+  color: var(--text);
+  background-color: var(--panel-2);
+  transition: width 0.3s var(--ease), background-color 0.3s var(--ease), border-color 0.3s var(--ease), color 0.3s var(--ease);
+}
+
+.hbr-icon-btn__sign {
   width: 100%;
-  display: inline-flex;
+  flex: none;
+  display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 34px;
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  background-color: var(--panel-2);
-  padding: 0.42rem 0.85rem;
-  color: var(--text);
-  outline: 0;
-  text-align: center;
-  text-decoration: none;
-  transition: all 0.2s ease;
+  transition: width 0.3s var(--ease), padding 0.3s var(--ease);
 }
 
-.playstore-button::before {
-  content: "";
+.hbr-icon-btn__sign svg {
+  width: 16px;
+  height: 16px;
+  flex: none;
+}
+
+.hbr-icon-btn__sign svg path {
+  fill: currentColor;
+}
+
+.hbr-icon-btn__text {
   position: absolute;
-  top: 0;
-  left: -60%;
-  width: 40%;
-  height: 100%;
-  background: linear-gradient(115deg, transparent, rgba(254, 163, 11, 0.35), transparent);
-  transform: skewX(-20deg);
-  transition: left 0.55s ease;
-  pointer-events: none;
-}
-
-.playstore-button:hover {
-  border-color: var(--accent);
-  background-color: var(--panel-3);
-}
-
-.playstore-button:hover::before {
-  left: 130%;
-}
-
-.playstore-button span {
-  margin-bottom: 0;
-  text-transform: none;
-  letter-spacing: 0;
-}
-
-.texts {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  line-height: 1;
-}
-
-.text-1 {
-  margin-bottom: 0.12rem;
-  font-size: 0.58rem;
-  line-height: 0.75rem;
+  right: 0;
+  width: 0%;
+  overflow: hidden;
+  opacity: 0;
+  white-space: nowrap;
+  font-size: 12px;
   font-weight: 800;
+  transition: opacity 0.25s var(--ease), width 0.3s var(--ease), padding 0.3s var(--ease);
 }
 
-.text-2 {
-  font-size: 0.88rem;
-  font-weight: 900;
+.hbr-icon-btn:hover {
+  width: 112px;
+  border-color: transparent;
+  background-color: var(--btn-bg-hover);
+  color: var(--btn-fg-hover);
+}
+
+.hbr-icon-btn:hover .hbr-icon-btn__sign {
+  width: 30%;
+  padding-left: 14px;
+}
+
+.hbr-icon-btn:hover .hbr-icon-btn__text {
+  opacity: 1;
+  width: 70%;
+  padding-right: 10px;
+}
+
+.hbr-icon-btn:active {
+  transform: translate(1px, 1px);
+}
+
+.hbr-icon-btn-logout {
+  --btn-bg-hover: var(--danger);
+  --btn-fg-hover: #f5f5f5;
 }
 
 .workspace {
@@ -1081,7 +1062,7 @@ button {
 .admin-heading-corner {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 34px;
 }
 
 /* ===== Mascote do painel Admin — adaptado de um componente de Uiverse.io (by BlackisPlay, "sweet-frog-67"), reskinado na paleta HBR ===== */
