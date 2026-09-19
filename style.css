@@ -564,6 +564,27 @@ button {
   min-width: 0;
 }
 
+.sidebar-user-actions {
+  width: 100%;
+  display: flex;
+  gap: 8px;
+}
+
+.sidebar-user-actions .playstore-button {
+  width: auto;
+  flex: 1;
+  min-width: 0;
+}
+
+.logout-btn:hover {
+  border-color: var(--danger);
+  background-color: rgba(248, 81, 73, 0.12);
+}
+
+.logout-btn:hover .text-1 {
+  color: var(--danger);
+}
+
 .playstore-button {
   position: relative;
   overflow: hidden;

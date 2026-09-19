@@ -3492,6 +3492,19 @@ el.rabInfoModal?.addEventListener("click", (event) => {
   if (event.target === el.rabInfoModal) fecharInformacoesRab();
 });
 el.adminAccessBtn?.addEventListener("click", requestAdminAccess);
+document.getElementById("logoutBtn")?.addEventListener("click", async () => {
+  if (!confirm("Sair da sua conta?")) return;
+  try {
+    // Fecha o acesso ao painel Admin (senha do PIN) junto com o logout, para o próximo
+    // usuário a entrar nesse navegador não herdar o painel já destravado.
+    adminUnlocked = false;
+    sessionStorage.removeItem(ADMIN_UNLOCK_KEY);
+    await auth.signOut();
+  } catch (err) {
+    console.error("Não foi possível sair da conta.", err);
+    alert("Não foi possível sair da conta. Tente novamente.");
+  }
+});
 el.adminGateForm?.addEventListener("submit", handleAdminGateSubmit);
 el.adminGateCloseBtn?.addEventListener("click", closeAdminGate);
 el.adminGateCancelBtn?.addEventListener("click", closeAdminGate);
